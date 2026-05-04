@@ -1,0 +1,20 @@
+{
+    "KPlugin": {
+        "Name": "Kate Agent",
+        "Name[it]": "Kate Agent",
+        "Description": "AI coding agent for Kate editor with tool execution and code assistance",
+        "Description[it]": "Agente AI per Kate con esecuzione di tool e assistenza al codice",
+        "Category": "Editor",
+        "EnabledByDefault": false,
+        "Icon": "utilities-terminal",
+        "Version": "0.1.0",
+        "License": "GPL-3.0-or-later",
+        "Author": "Kate Agent Contributors",
+        "Website": "https://github.com/kate-editor/kate-agent-plugin"
+    },
+    "X-KTextEditor-Requirements": {
+        "KTextEditor": ">=5.90.0",
+        "Qt": ">=6.0.0",
+        "KF6": ">=6.0.0"
+    }
+}

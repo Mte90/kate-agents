@@ -1,0 +1,16 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Kate Agent
+Comment=AI coding agent for Kate editor
+Type=Service
+Icon=utilities-terminal
+X-KDE-ParentApp=kate
+X-KDE-Library=kateagentplugin
+X-KDE-PluginInfo-Author=Agent Team
+X-KDE-PluginInfo-Name=kateagentplugin
+X-KDE-PluginInfo-Version=1.0.0
+X-KDE-PluginInfo-Category=Editor
+X-KDE-PluginInfo-Depends=
+X-KDE-PluginInfo-EnabledByDefault=true
+X-KTextEditor-InterfaceVersion=2
+ServiceTypes=KTextEditor/Plugin
