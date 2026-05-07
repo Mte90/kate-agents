@@ -138,7 +138,7 @@ void OpenAIProvider::chatStream(
     int maxTokens)
 {
     // Non-streaming fallback - call chat and emit callbacks
-    QtConcurrent::run([this, messages, tools, model, temperature, maxTokens, onChunk, onDone, onError]() {
+    (void)QtConcurrent::run([this, messages, tools, model, temperature, maxTokens, onChunk, onDone, onError]() {
         QEventLoop loop;
         LLMResponse response;
         QString err;

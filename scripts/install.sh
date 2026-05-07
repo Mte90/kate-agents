@@ -4,44 +4,42 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN_DIR="${SCRIPT_DIR}/build"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PLUGIN_DIR="${PROJECT_DIR}/build"
 
-# Find Kate plugins directory
-KATE_PLUGIN_DIRS=(
-    "$HOME/.local/lib/kate/plugins"
-    "$HOME/.kde/lib/kate/plugins"
-    "$HOME/.kde5/lib/kate/plugins"
-    "/usr/lib/x86_64-linux-gnu/kate/plugins"
-    "/usr/lib/kate/plugins"
-    "/usr/local/lib/kate/plugins"
-)
+# Kate KTextEditor plugin directory (where Kate actually looks)
+KATE_PLUGIN_DIR="/usr/lib/x86_64-linux-gnu/qt6/plugins/kf6/ktexteditor"
 
-install_dir=""
-for dir in "${KATE_PLUGIN_DIRS[@]}"; do
-    if [ -d "$dir" ] || [ -w "$(dirname "$dir")" ]; then
-        install_dir="$dir"
-        break
-    fi
-done
-
-if [ -z "$install_dir" ]; then
-    install_dir="$HOME/.local/lib/kate/plugins"
-    mkdir -p "$install_dir"
-fi
-
-echo "Installing Kate Agent Plugin to: $install_dir"
-
-# Check if plugin exists
+# Check if plugin exists, build if not
 if [ ! -f "$PLUGIN_DIR/libkateagentplugin.so" ]; then
     echo "Building plugin first..."
-    cd "$SCRIPT_DIR"
+    cd "$PROJECT_DIR"
     rm -rf build
-    cmake -B build . && cmake --build build
+    cmake -B build . && cmake --build build -j"$(nproc)"
 fi
 
-# Copy plugin
-cp "$PLUGIN_DIR/libkateagentplugin.so" "$install_dir/"
-echo "✅ Installed libkateagentplugin.so to $install_dir"
+echo "Installing Kate Agent Plugin..."
+
+# Check if we can write to system plugin dir
+if [ -w "$KATE_PLUGIN_DIR" ] || [ "$EUID" -eq 0 ]; then
+    # Direct copy or symlink to system dir
+    ln -sf "$PLUGIN_DIR/libkateagentplugin.so" "$KATE_PLUGIN_DIR/libkateagentplugin.so"
+    echo "✅ Installed symlink: $KATE_PLUGIN_DIR/libkateagentplugin.so -> $PLUGIN_DIR/libkateagentplugin.so"
+else
+    echo "⚠️  Need root to install to $KATE_PLUGIN_DIR"
+    echo "   Running with sudo..."
+    sudo ln -sf "$PLUGIN_DIR/libkateagentplugin.so" "$KATE_PLUGIN_DIR/libkateagentplugin.so"
+    echo "✅ Installed symlink: $KATE_PLUGIN_DIR/libkateagentplugin.so -> $PLUGIN_DIR/libkateagentplugin.so"
+fi
+
+# Also install the JSON metadata file
+if [ -f "$PROJECT_DIR/src/kateagentplugin.json" ]; then
+    if [ -w "$KATE_PLUGIN_DIR" ] || [ "$EUID" -eq 0 ]; then
+        cp "$PROJECT_DIR/src/kateagentplugin.json" "$KATE_PLUGIN_DIR/"
+    else
+        sudo cp "$PROJECT_DIR/src/kateagentplugin.json" "$KATE_PLUGIN_DIR/"
+    fi
+fi
 
 echo ""
 echo "To use the plugin:"

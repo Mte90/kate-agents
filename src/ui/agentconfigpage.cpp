@@ -69,7 +69,7 @@ AgentConfigPage::AgentConfigPage(QWidget *parent, KateAgentPlugin *plugin)
     // Buffer Context
     m_bufferContextCheckbox = new QCheckBox(i18n("Include editor context in prompts"), this);
     layout->addWidget(m_bufferContextCheckbox);
-    connect(m_bufferContextCheckbox, &QCheckBox::stateChanged, this, &AgentConfigPage::changed);
+    connect(m_bufferContextCheckbox, &QCheckBox::checkStateChanged, this, &AgentConfigPage::changed);
 
     layout->addStretch();
     
