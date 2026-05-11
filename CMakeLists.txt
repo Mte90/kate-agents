@@ -61,6 +61,7 @@ set(KATEAGENTPLUGIN_LIB_SRCS
 )
 
 add_library(kateagentplugin MODULE ${KATEAGENTPLUGIN_LIB_SRCS})
+set_target_properties(kateagentplugin PROPERTIES PREFIX "")
 
 target_include_directories(kateagentplugin PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(kateagentplugin

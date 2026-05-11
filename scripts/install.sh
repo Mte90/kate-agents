@@ -11,7 +11,7 @@ PLUGIN_DIR="${PROJECT_DIR}/build"
 KATE_PLUGIN_DIR="/usr/lib/x86_64-linux-gnu/qt6/plugins/kf6/ktexteditor"
 
 # Check if plugin exists, build if not
-if [ ! -f "$PLUGIN_DIR/libkateagentplugin.so" ]; then
+if [ ! -f "$PLUGIN_DIR/kateagentplugin.so" ]; then
     echo "Building plugin first..."
     cd "$PROJECT_DIR"
     rm -rf build
@@ -20,25 +20,15 @@ fi
 
 echo "Installing Kate Agent Plugin..."
 
-# Check if we can write to system plugin dir
 if [ -w "$KATE_PLUGIN_DIR" ] || [ "$EUID" -eq 0 ]; then
-    # Direct copy or symlink to system dir
-    ln -sf "$PLUGIN_DIR/libkateagentplugin.so" "$KATE_PLUGIN_DIR/libkateagentplugin.so"
-    echo "✅ Installed symlink: $KATE_PLUGIN_DIR/libkateagentplugin.so -> $PLUGIN_DIR/libkateagentplugin.so"
+    ln -sf "$PLUGIN_DIR/kateagentplugin.so" "$KATE_PLUGIN_DIR/kateagentplugin.so"
+    cp "$PROJECT_DIR/src/kateagentplugin.json" "$KATE_PLUGIN_DIR/"
+    echo "✅ Installed to $KATE_PLUGIN_DIR/"
 else
     echo "⚠️  Need root to install to $KATE_PLUGIN_DIR"
-    echo "   Running with sudo..."
-    sudo ln -sf "$PLUGIN_DIR/libkateagentplugin.so" "$KATE_PLUGIN_DIR/libkateagentplugin.so"
-    echo "✅ Installed symlink: $KATE_PLUGIN_DIR/libkateagentplugin.so -> $PLUGIN_DIR/libkateagentplugin.so"
-fi
-
-# Also install the JSON metadata file
-if [ -f "$PROJECT_DIR/src/kateagentplugin.json" ]; then
-    if [ -w "$KATE_PLUGIN_DIR" ] || [ "$EUID" -eq 0 ]; then
-        cp "$PROJECT_DIR/src/kateagentplugin.json" "$KATE_PLUGIN_DIR/"
-    else
-        sudo cp "$PROJECT_DIR/src/kateagentplugin.json" "$KATE_PLUGIN_DIR/"
-    fi
+    sudo ln -sf "$PLUGIN_DIR/kateagentplugin.so" "$KATE_PLUGIN_DIR/kateagentplugin.so"
+    sudo cp "$PROJECT_DIR/src/kateagentplugin.json" "$KATE_PLUGIN_DIR/"
+    echo "✅ Installed to $KATE_PLUGIN_DIR/"
 fi
 
 echo ""
