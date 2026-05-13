@@ -7,6 +7,7 @@
 
 ThreadStorage::ThreadStorage(QObject *parent)
     : QObject(parent)
+    , m_currentProjectId(QString())
 {
 }
 
@@ -16,7 +17,6 @@ ThreadStorage::~ThreadStorage()
 
 QString ThreadStorage::databasePath() const
 {
-    Q_UNUSED(this);
     QString dataLocation = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QString kateAgentDir = dataLocation + QLatin1String("/kate/agents");
     return kateAgentDir;
@@ -29,10 +29,40 @@ bool ThreadStorage::initialize()
     return true;
 }
 
+void ThreadStorage::setCurrentProjectId(const QString &projectId)
+{
+    m_currentProjectId = projectId;
+    ThreadJsonStorage::setCurrentProjectId(projectId);
+}
+
 QMap<QString, ConversationThread> ThreadStorage::loadAllThreads()
 {
     QMap<QString, ConversationThread> threads;
     QStringList threadIds = ThreadJsonStorage::listThreads();
+    
+    for (const QString &threadId : threadIds) {
+        QList<LLMMessage> messages = ThreadJsonStorage::loadThread(threadId);
+        
+        ConversationThread thread;
+        thread.id = threadId;
+        thread.messages = messages;
+        
+        threads[threadId] = thread;
+    }
+    
+    return threads;
+}
+
+QMap<QString, ConversationThread> ThreadStorage::loadThreadsForProject(const QString &projectId)
+{
+    QMap<QString, ConversationThread> threads;
+    
+    QString effectiveProjectId = projectId.isEmpty() ? m_currentProjectId : projectId;
+    if (effectiveProjectId.isEmpty()) {
+        effectiveProjectId = ThreadJsonStorage::getCurrentProjectId();
+    }
+    
+    QStringList threadIds = ThreadJsonStorage::listThreadsForProject(effectiveProjectId);
     
     for (const QString &threadId : threadIds) {
         QList<LLMMessage> messages = ThreadJsonStorage::loadThread(threadId);
@@ -61,7 +91,6 @@ bool ThreadStorage::saveThread(const ConversationThread &thread)
     }
     
     QString path = ThreadJsonStorage::saveThread(thread.id, messages, thread.title);
-    (void)path;
     return !path.isEmpty();
 }
 

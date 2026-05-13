@@ -23,11 +23,90 @@
 #include <KPluginFactory>
 #include <KTextEditor/View>
 #include <KTextEditor/MainWindow>
+#include <KXMLGUIClient>
+#include <KXMLGUIFactory>
 #include <QDockWidget>
 #include <QMainWindow>
 #include <QDebug>
 
 K_PLUGIN_FACTORY_WITH_JSON(KateAgentPluginFactory, "kateagentplugin.json", registerPlugin<KateAgentPlugin>();)
+
+class AgentGuiClient : public QObject, public KXMLGUIClient
+{
+    Q_OBJECT
+public:
+    AgentGuiClient(KateAgentPlugin *plugin, KTextEditor::MainWindow *mainwindow)
+        : QObject()
+        , KXMLGUIClient()
+        , m_plugin(plugin)
+        , m_mainWindow(mainwindow)
+    {
+        setComponentName("kateagent", i18n("Kate Agent"));
+        
+        // Create the actual panel
+        m_panel = new AgentPanel(plugin->m_agentLoop, plugin->m_registry, 
+                                 plugin->m_provider, plugin->m_config, 
+                                 plugin->m_permissions);
+        
+        // Create action collection
+        auto ac = actionCollection();
+        
+        // Action to toggle dock visibility
+        auto toggleAction = ac->addAction("kateagent-toggle");
+        toggleAction->setText(i18n("Toggle Kate Agent Panel"));
+        toggleAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_A));
+        toggleAction->setIcon(QIcon::fromTheme("dialog-information"));
+        connect(toggleAction, &QAction::triggered, this, [this]() {
+            if (!m_dock) {
+                m_dock = new QDockWidget(tr("Kate Agent"), m_mainWindow->window());
+                m_dock->setObjectName("KateAgentDock");
+                m_dock->setWidget(m_panel);
+                m_dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable);
+                QMainWindow *mainWindow = qobject_cast<QMainWindow*>(m_mainWindow->window());
+                if (mainWindow) {
+                    mainWindow->addDockWidget(Qt::RightDockWidgetArea, m_dock);
+                    // Show dock widget immediately
+                    m_dock->show();
+                }
+            }
+            if (m_dock->isVisible()) {
+                m_dock->hide();
+            } else {
+                m_dock->show();
+                m_dock->raise();
+                m_dock->activateWindow();
+            }
+        });
+        
+        // Show dock widget immediately on plugin load
+        m_dock = new QDockWidget(tr("Kate Agent"), m_mainWindow->window());
+        m_dock->setObjectName("KateAgentDock");
+        m_dock->setWidget(m_panel);
+        m_dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable);
+        QMainWindow *mainWindow = qobject_cast<QMainWindow*>(m_mainWindow->window());
+        if (mainWindow) {
+            mainWindow->addDockWidget(Qt::RightDockWidgetArea, m_dock);
+            m_dock->show();
+        }
+        
+        // Install gui client
+        m_mainWindow->guiFactory()->addClient(this);
+    }
+    
+    ~AgentGuiClient() override {
+        if (m_mainWindow) {
+            m_mainWindow->guiFactory()->removeClient(this);
+        }
+    }
+    
+    QWidget* panel() const { return m_panel; }
+    
+private:
+    KateAgentPlugin *m_plugin;
+    KTextEditor::MainWindow *m_mainWindow;
+    AgentPanel *m_panel;
+    QDockWidget *m_dock = nullptr;
+};
 
 KateAgentPlugin::KateAgentPlugin(QObject *parent, const QVariantList &) : KTextEditor::Plugin(parent)
 {
@@ -35,6 +114,7 @@ KateAgentPlugin::KateAgentPlugin(QObject *parent, const QVariantList &) : KTextE
     m_registry = new ToolRegistry(this);
     m_config = new ConfigManager(this);
     m_config->load();
+    m_config->save();  // Force save default config so Kate shows config page
     
     // Initialize provider with config
     auto providerCfg = m_config->getProviderConfig(m_config->getActiveProvider());
@@ -68,15 +148,7 @@ KateAgentPlugin::~KateAgentPlugin()
 
 QObject *KateAgentPlugin::createView(KTextEditor::MainWindow *mw)
 {
-    // Create AgentPanel - this connects all AgentLoop signals to UI slots
-    m_agentPanel = new AgentPanel(m_agentLoop, m_registry, m_provider, m_config, m_permissions);
-    
-    // Connect settingsChanged signal to reload models in the panel
-    connect(this, &KateAgentPlugin::settingsChanged, m_agentPanel, [this]() {
-        if (m_agentPanel) {
-            m_agentPanel->reloadModels();
-        }
-    });
+    qDebug() << "KateAgentPlugin: createView starting";
     
     // Set main window reference for editor context access
     m_agentLoop->setMainWindow(mw);
@@ -94,67 +166,15 @@ QObject *KateAgentPlugin::createView(KTextEditor::MainWindow *mw)
         m_contextMenuHandler->installContextMenu(view);
     });
     
-    // Create dock widget to show the panel in Kate's sidebar
-    QDockWidget *dock = new QDockWidget(tr("Kate Agent"), mw->window());
-    dock->setObjectName("KateAgentDock");
-    dock->setWidget(m_agentPanel);
-    dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable);
-    
-    // Add dock widget to the right sidebar using QMainWindow
-    QMainWindow *mainWindow = qobject_cast<QMainWindow*>(mw->window());
-    if (mainWindow) {
-        mainWindow->addDockWidget(Qt::RightDockWidgetArea, dock);
-        // Show dock widget by default
-        dock->show();
-    }
-    
-    // Create action collection for shortcuts
-    auto v = new QObject(this);
-    auto ac = new KActionCollection(v);
-    ac->setParent(mw->window());
-    
-    // Action to toggle dock visibility
-    auto toggleAction = ac->addAction("kateagent-toggle");
-    toggleAction->setText(i18n("Toggle Kate Agent Panel"));
-    toggleAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_A));
-    toggleAction->setIcon(QIcon::fromTheme("dialog-information"));
-    QObject::connect(toggleAction, &QAction::triggered, mw, [dock]() {
-        if (dock->isVisible()) {
-            dock->hide();
-        } else {
-            dock->show();
-            dock->raise();
-            dock->activateWindow();
-        }
-    });
-    
-    // Quick ask action
-    auto b = ac->addAction("kateagent-quick");
-    b->setText(i18n("Quick Ask"));
-    b->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Q));
-    QObject::connect(b, &QAction::triggered, mw, [mw]() {
-        auto v = mw->activeView();
-        if (v && !v->selectionText().isEmpty()) {
-            QVariantMap m;
-            m["type"] = "Info";
-            m["category"] = "Kate Agent";
-            m["text"] = "Selected: " + v->selectionText().left(60);
-            mw->showMessage(m);
-        }
-    });
-    
-    return v;
+    // Return GUI client (like kate-ollama does)
+    return new AgentGuiClient(this, mw);
 }
 
 KTextEditor::ConfigPage *KateAgentPlugin::configPage(int number, QWidget *parent)
 {
-    qDebug() << "[KateAgentPlugin] configPage() called with number=" << number << ", parent=" << parent;
-    if (number != 0) {
-        return nullptr;
-    }
-    auto *page = new AgentConfigPage(parent, this);
-    qDebug() << "[KateAgentPlugin] configPage() returning page:" << page;
-    return page;
+    Q_UNUSED(number)
+    Q_UNUSED(parent)
+    return new AgentConfigPage(parent, this);
 }
 
 int KateAgentPlugin::configPages() const

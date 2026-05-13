@@ -1,4 +1,5 @@
 #include "threadview.h"
+#include "llmprovider.h"
 #include <QTextDocument>
 #include <QTextCursor>
 #include <QTextBlock>
@@ -171,4 +172,21 @@ void ThreadView::toggleCursor()
     if (m_cursorBlinkCount >= 3) {
         m_cursorTimer->stop();
     }
+}
+
+void ThreadView::loadMessages(const QList<LLMMessage> &messages)
+{
+    clear();
+    
+    for (const auto &msg : messages) {
+        if (msg.role == "user") {
+            appendUserMessage(msg.content);
+        } else if (msg.role == "assistant") {
+            appendAssistantMessage(msg.content);
+        }
+    }
+    
+    QTextCursor cursor = textCursor();
+    cursor.movePosition(QTextCursor::End);
+    setTextCursor(cursor);
 }

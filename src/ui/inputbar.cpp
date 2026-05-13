@@ -95,6 +95,81 @@ void InputBar::onReturnPressed()
 void InputBar::onTextChanged()
 {
     m_sendButton->setEnabled(!m_inputEdit->toPlainText().trimmed().isEmpty());
+    
+    QString text = m_inputEdit->toPlainText();
+    QTextCursor cursor = m_inputEdit->textCursor();
+    int cursorPos = cursor.position();
+    
+    int atIndex = text.lastIndexOf('@', cursorPos - 1);
+    if (atIndex >= 0 && atIndex < cursorPos - 1) {
+        QString afterAt = text.mid(atIndex + 1, cursorPos - atIndex - 1);
+        if (!afterAt.contains(' ') && !afterAt.contains('\n')) {
+            showAutocompletePopup(atIndex);
+            return;
+        }
+    }
+    
+    m_filePopup->hide();
+}
+
+void InputBar::showAutocompletePopup(int atIndex)
+{
+    QString text = m_inputEdit->toPlainText();
+    QString filterText = text.mid(atIndex + 1);
+    
+    QStringList items;
+    
+    for (const QString &tool : m_availableTools) {
+        items.append(tool);
+    }
+    
+    QDir projectDir = QDir::current();
+    if (projectDir.exists()) {
+        QStringList files;
+        findFilesRecursive(projectDir, "", files, 2);
+        items.append(files);
+    }
+    
+    QStringList filtered;
+    for (const QString &item : items) {
+        if (item.contains(filterText, Qt::CaseInsensitive)) {
+            filtered.append(item);
+        }
+    }
+    
+    m_filePopup->m_filteredPaths = filtered;
+    m_filePopup->m_model->setStringList(filtered);
+    
+    if (!filtered.isEmpty()) {
+        QTextCursor cursor = m_inputEdit->textCursor();
+        QRect cursorRect = m_inputEdit->cursorRect(cursor);
+        QPoint globalPos = m_inputEdit->mapToGlobal(cursorRect.bottomLeft());
+        
+        m_filePopup->showAt(globalPos);
+    } else {
+        m_filePopup->hide();
+    }
+}
+
+void InputBar::findFilesRecursive(const QDir &dir, const QString &prefix, QStringList &result, int depth)
+{
+    if (depth <= 0 || result.count() >= 200) {
+        return;
+    }
+    
+    QFileInfoList fileInfoList = dir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QFileInfo &fileInfo : fileInfoList) {
+        if (!fileInfo.exists()) {
+            continue;
+        }
+        
+        QString path = prefix.isEmpty() ? fileInfo.fileName() : prefix + "/" + fileInfo.fileName();
+        result.append(path);
+        
+        if (fileInfo.isDir() && depth > 1) {
+            findFilesRecursive(fileInfo.dir(), path, result, depth - 1);
+        }
+    }
 }
 
 void InputBar::insertFilePath(const QString &filePath)
@@ -118,7 +193,7 @@ void InputBar::insertFilePath(const QString &filePath)
         QTextCursor cursor = m_inputEdit->textCursor();
         cursor.setPosition(atIndex + filePath.length() + 1);
         m_inputEdit->setTextCursor(cursor);
-        m_filePopup->hide();
+        m_filePopup->hidePopup();
     }
 }
 

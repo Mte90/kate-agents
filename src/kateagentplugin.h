@@ -23,9 +23,8 @@ public:
     ~KateAgentPlugin() override;
     QObject *createView(KTextEditor::MainWindow *mw) override;
 
-    int configPages() const override;
-
     KTextEditor::ConfigPage *configPage(int number = 0, QWidget *parent = nullptr) override;
+    int configPages() const override;
 
 signals:
     void settingsChanged();
@@ -40,5 +39,6 @@ private:
     ContextMenuHandler *m_contextMenuHandler = nullptr;
     
     friend class AgentConfigPage;
+    friend class AgentGuiClient;
 };
 #endif

@@ -32,10 +32,26 @@ The plugin automatically executes tools based on LLM instructions:
 - Up to 20 iterations to prevent infinite loops
 - Tool output displayed inline in the chat
 
+### 📋 Multiple Chat Tabs
+- Support for multiple concurrent chats
+- Each tab has its own conversation history
+- Close individual tabs with X button
+- Create new chats with + button
+- Automatic tab naming (Chat 1, Chat 2, etc.)
+- Tab titles update based on first message
+
 ### 💾 Conversation Persistence
 - Automatic thread saving to JSON files
-- Conversation history loading
+- Conversation history loading on startup
+- **Project-based isolation**: Chats are organized by git repository or file
 - Path: `~/.config/kate/agents/`
+- File naming:
+  - Git repos: `{repo-name}_chat_YYYYMMDD_N.json` (e.g., `kate-agents_chat_20260513_1.json`)
+  - Single files: `{filename}_chat_YYYYMMDD_N.json` (e.g., `main.cpp_chat_20260513_1.json`)
+  - Directories: `{dirname}_chat_YYYYMMDD_N.json` (e.g., `projects_chat_20260513_1.json`)
+- Auto-save every 30 seconds
+- Auto-save when switching tabs
+- Auto-save after each turn completes
 
 ### 👤 Agent Profiles
 Three modes for different scenarios:

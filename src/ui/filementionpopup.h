@@ -16,6 +16,7 @@ public:
     ~FileMentionPopup() override;
 
     void populateFromDirectory(const QString &projectDir);
+    void addTools(const QStringList &tools);
     void showAt(const QPoint &pos);
     void hidePopup();
 
@@ -40,6 +41,7 @@ public:
     QStringListModel *m_model;
     QStringList m_allPaths;
     QStringList m_filteredPaths;
+    QStringList m_tools;
 };
 
 #endif // FILEMENTIONPOPUP_H

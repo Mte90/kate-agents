@@ -1,18 +1,14 @@
 {
     "KPlugin": {
-        "Name": "Kate Agent",
+        "Authors": [
+            {
+                "Email": "mte90net@gmail.com",
+                "Name": "Daniele Mte90 Scasciafratte"
+            }
+        ],
         "Description": "AI coding agent for Kate editor with tool execution and code assistance",
-        "Category": "Editor",
         "Icon": "utilities-terminal",
-        "Version": "0.1.0",
-        "License": "GPL-3.0-or-later",
-        "Author": "Kate Agent Contributors",
-        "Website": "https://github.com/kate-editor/kate-agent-plugin",
+        "Name": "Kate Agent",
         "ServiceTypes": ["KTextEditor/Plugin"]
-    },
-    "X-KTextEditor-Requirements": {
-        "KTextEditor": ">=5.90.0",
-        "Qt": ">=6.0.0",
-        "KF6": ">=6.0.0"
     }
 }

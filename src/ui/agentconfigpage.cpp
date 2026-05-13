@@ -126,6 +126,7 @@ void AgentConfigPage::fetchModelList()
                     });
                     
                     // Use saved model if combo box is empty (first load), otherwise keep current selection
+                    QString currentModel = m_modelComboBox->currentText();
                     QString modelToSelect = m_savedModel.isEmpty() ? currentModel : m_savedModel;
                     
                     int modelSelected = -1;

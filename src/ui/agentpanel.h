@@ -9,6 +9,7 @@
 
 #include "threadview.h"
 #include "inputbar.h"
+#include "../threadstorage.h"
 
 class AgentLoop;
 class ToolRegistry;
@@ -44,10 +45,19 @@ private slots:
     void onError(const QString &error);
     void onRunningChanged(bool running);
     void onPermissionRequested(const QString &toolName);
+    void onNewChat();
+    void onTabCloseRequested(int index);
+    void onCurrentTabChanged(int index);
 
 private:
     void setupUi();
     void connectSignals();
+    void createNewChatTab();
+    void closeChatTab(int index);
+    void updateTabTitle(int index, const QString &title);
+    void saveCurrentThread();
+    void loadExistingThreads();
+    QString generateChatTitle(int chatNumber);
     
     AgentLoop *m_agent;
     ToolRegistry *m_registry;
@@ -55,9 +65,12 @@ private:
     ConfigManager *m_config;
     PermissionManager *m_permissions;
     
-    ThreadView *m_threadView;
-    InputBar *m_inputBar;
     QTabWidget *m_tabs;
+    InputBar *m_inputBar;
+    
+    ThreadStorage *m_threadStorage;
+    int m_chatCounter;
+    QString m_currentThreadId;
 };
 
 #endif

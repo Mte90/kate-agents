@@ -18,12 +18,15 @@ public:
 
     bool initialize();
     QMap<QString, ConversationThread> loadAllThreads();
+    QMap<QString, ConversationThread> loadThreadsForProject(const QString &projectId);
     bool saveThread(const ConversationThread &thread);
     bool saveAllThreads(const QMap<QString, ConversationThread> &threads);
     bool deleteThread(const QString &threadId);
+    void setCurrentProjectId(const QString &projectId);
 
 private:
     QString databasePath() const;
+    QString m_currentProjectId;
 };
 
 #endif // THREADSTORAGE_H

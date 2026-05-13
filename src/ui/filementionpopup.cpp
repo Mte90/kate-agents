@@ -53,6 +53,15 @@ void FileMentionPopup::addAllRecursively(const QDir &dir, int depth)
     }
 }
 
+void FileMentionPopup::addTools(const QStringList &tools)
+{
+    m_tools = tools;
+    // Re-apply current filter to include tools
+    if (!m_filteredPaths.isEmpty()) {
+        filterPaths(m_filteredPaths.first().split('@').last());
+    }
+}
+
 void FileMentionPopup::showAt(const QPoint &pos)
 {
     if (!m_listView || !m_model) {

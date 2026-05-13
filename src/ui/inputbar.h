@@ -8,6 +8,7 @@
 #include <QVBoxLayout>
 #include <QComboBox>
 #include <QString>
+#include <QDir>
 
 class FileMentionPopup;
 class AgentLoop;
@@ -50,6 +51,9 @@ private slots:
 
 private:
     bool eventFilter(QObject *obj, QEvent *event) override;
+    void showAutocompletePopup(int atIndex);
+    void findFilesRecursive(const QDir &dir, const QString &prefix, QStringList &result, int depth);
+    
     QTextEdit *m_inputEdit;
     QPushButton *m_sendButton;
     QComboBox *m_modelCombo;
@@ -58,6 +62,7 @@ private:
     AgentLoop *m_agentLoop = nullptr;
     bool m_isRunning = false;
     QString m_systemPrompt;
+    QStringList m_availableTools = {"read_file", "edit_file", "grep", "terminal", "web_search", "url_fetch", "diagnostics", "find_path", "list_directory", "create_directory"};
 };
 
 #endif

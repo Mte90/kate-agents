@@ -4,6 +4,9 @@
 #include <QTextBrowser>
 #include <QWidget>
 #include <QJsonObject>
+#include <QList>
+
+class LLMMessage;
 
 class ThreadView : public QTextBrowser
 {
@@ -20,6 +23,7 @@ public:
     void showStreamingChunk(const QString &chunk);
     void clear();
     void appendHtml(const QString &html);
+    void loadMessages(const QList<LLMMessage> &messages);
 
 signals:
     void linkClicked(const QString &url);
