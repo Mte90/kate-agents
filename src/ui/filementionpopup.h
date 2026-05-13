@@ -26,7 +26,7 @@ private slots:
     void onCurrentChanged(const QModelIndex &current);
 
 protected:
-    void keyPressEvent(QKeyEvent *event);
+    void keyPressEvent(QKeyEvent *event) override;
 
 private:
     void setupUI();

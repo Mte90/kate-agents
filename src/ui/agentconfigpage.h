@@ -43,6 +43,7 @@ private:
     QCheckBox *m_bufferContextCheckbox;
     QLabel *m_infoLabel;
     QNetworkAccessManager *m_networkManager;
+    QString m_savedModel;  // Model saved from settings to be selected after model list loads
 };
 
 #endif

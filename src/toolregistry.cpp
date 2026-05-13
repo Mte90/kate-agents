@@ -121,5 +121,3 @@ bool ToolRegistry::requiresPermission(const QString &name) const
     }
     return false;
 }
-
-#include "toolregistry.moc"

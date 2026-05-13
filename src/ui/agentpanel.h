@@ -30,6 +30,7 @@ public:
     QAction *createAction();
 
 public slots:
+    void reloadModels();
     void onSendMessage(const QString &message);
     void onStopRequested();
     void onModelChanged(const QString &model);

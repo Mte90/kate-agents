@@ -2,6 +2,7 @@
 #define READFILETOOL_H
 
 #include "../toolregistry.h"
+#include <KLocalizedString>
 #include <QFile>
 #include <QTextStream>
 
@@ -14,7 +15,7 @@ public:
 
     QString name() const override { return "read_file"; }
     QString description() const override {
-        return "Legge il contenuto di un file nel progetto.";
+        return i18n("Reads the content of a file in the project.");
     }
 
     QJsonObject parametersSchema() const override {
@@ -23,7 +24,7 @@ public:
         QJsonObject properties;
         QJsonObject pathProp;
         pathProp["type"] = "string";
-        pathProp["description"] = "Percorso del file da leggere";
+        pathProp["description"] = i18n("Path of the file to read");
         properties["path"] = pathProp;
         schema["properties"] = properties;
         schema["required"] = QJsonArray{"path"};
@@ -36,7 +37,7 @@ public:
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             return QJsonObject{
-                {"error", "Impossibile leggere il file: " + path},
+                {"error", i18n("Cannot read file: ") + path},
                 {"success", false}
             };
         }

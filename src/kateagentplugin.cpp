@@ -14,16 +14,24 @@
 #include "tools/terminaltool.h"
 #include "tools/websearchtool.h"
 #include "tools/urlfetchtool.h"
+#include "tools/diagnosticstool.h"
+#include "tools/findpathtool.h"
+#include "tools/listdirectorytool.h"
+#include "tools/createdirectorytool.h"
 #include <KActionCollection>
 #include <KLocalizedString>
+#include <KPluginFactory>
 #include <KTextEditor/View>
 #include <KTextEditor/MainWindow>
 #include <QDockWidget>
 #include <QMainWindow>
+#include <QDebug>
 
-KateAgentPlugin::KateAgentPlugin(QObject *p, const QVariantList &a) : KTextEditor::Plugin(p)
+K_PLUGIN_FACTORY_WITH_JSON(KateAgentPluginFactory, "kateagentplugin.json", registerPlugin<KateAgentPlugin>();)
+
+KateAgentPlugin::KateAgentPlugin(QObject *parent, const QVariantList &) : KTextEditor::Plugin(parent)
 {
-    Q_UNUSED(a);
+    qDebug() << "[KateAgentPlugin] Constructor called - plugin loading...";
     m_registry = new ToolRegistry(this);
     m_config = new ConfigManager(this);
     m_config->load();
@@ -42,6 +50,10 @@ KateAgentPlugin::KateAgentPlugin(QObject *p, const QVariantList &a) : KTextEdito
     m_registry->registerTool(new TerminalTool(this));
     m_registry->registerTool(new WebSearchTool(this));
     m_registry->registerTool(new URLFetchTool(this));
+    m_registry->registerTool(new DiagnosticsTool(this));
+    m_registry->registerTool(new FindPathTool(this));
+    m_registry->registerTool(new ListDirectoryTool(this));
+    m_registry->registerTool(new CreateDirectoryTool(this));
 }
 
 KateAgentPlugin::~KateAgentPlugin()
@@ -58,6 +70,13 @@ QObject *KateAgentPlugin::createView(KTextEditor::MainWindow *mw)
 {
     // Create AgentPanel - this connects all AgentLoop signals to UI slots
     m_agentPanel = new AgentPanel(m_agentLoop, m_registry, m_provider, m_config, m_permissions);
+    
+    // Connect settingsChanged signal to reload models in the panel
+    connect(this, &KateAgentPlugin::settingsChanged, m_agentPanel, [this]() {
+        if (m_agentPanel) {
+            m_agentPanel->reloadModels();
+        }
+    });
     
     // Set main window reference for editor context access
     m_agentLoop->setMainWindow(mw);
@@ -85,6 +104,8 @@ QObject *KateAgentPlugin::createView(KTextEditor::MainWindow *mw)
     QMainWindow *mainWindow = qobject_cast<QMainWindow*>(mw->window());
     if (mainWindow) {
         mainWindow->addDockWidget(Qt::RightDockWidgetArea, dock);
+        // Show dock widget by default
+        dock->show();
     }
     
     // Create action collection for shortcuts
@@ -125,11 +146,21 @@ QObject *KateAgentPlugin::createView(KTextEditor::MainWindow *mw)
     return v;
 }
 
-KTextEditor::ConfigPage *KateAgentPlugin::configPage(int n, QWidget *p)
+KTextEditor::ConfigPage *KateAgentPlugin::configPage(int number, QWidget *parent)
 {
-    Q_UNUSED(n);
-    // Return config page for plugin settings
-    return new AgentConfigPage(p, this);
+    qDebug() << "[KateAgentPlugin] configPage() called with number=" << number << ", parent=" << parent;
+    if (number != 0) {
+        return nullptr;
+    }
+    auto *page = new AgentConfigPage(parent, this);
+    qDebug() << "[KateAgentPlugin] configPage() returning page:" << page;
+    return page;
+}
+
+int KateAgentPlugin::configPages() const
+{
+    return 1;
 }
 
 #include "kateagentplugin.moc"
+

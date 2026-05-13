@@ -2,7 +2,7 @@
 #include <QFileDialog>
 #include <QDir>
 #include <QApplication>
-#include <Q Event>
+#include <QEvent>
 
 DiffPreviewDialog::DiffPreviewDialog(const QString &filePath,
                                      const QString &original,
@@ -83,16 +83,10 @@ void DiffPreviewDialog::setupUi()
 
 void DiffPreviewDialog::applyDiffFormatting(QTextEdit *edit, const QString &html, const QString &type)
 {
-    edit->setHtml(html);
-    edit->setStyleSheet(
-        "QTextEdit {"
-        "    background: " + (type == "original" ? "#ffebee" : "#e8f5e9") + ";"
-        "    border: 1px solid " + (type == "original" ? "#ffcdd2" : "#c8e6c9") + ";"
-        "    border-radius: 3px;"
-        "    padding: 5px;"
-        "    color: #333;"
-        "}"
-    );
+    Q_UNUSED(edit)
+    Q_UNUSED(html)
+    Q_UNUSED(type)
+    // Use native KDE styling - no custom formatting
 }
 
 QString DiffPreviewDialog::computeSimpleDiff(const QString &original, const QString &modified)
@@ -104,10 +98,8 @@ QString DiffPreviewDialog::computeSimpleDiff(const QString &original, const QStr
 
     for (int i = 0; i < qMin(originalLines.size(), modifiedLines.size()); ++i) {
         if (originalLines[i] == modifiedLines[i]) {
-            html += QString("<div><span style='background: %1; color: #666;'>%2</span></div>")
+            html += QString("<div><span style='background: #666; color: #ddd;'>✓</span></div>")
                    .arg(i + 1)
-                   .arg(QApplication::style()->renderPolygon(0, 0, 0, 0, 0));
-            html += QString("<div style='padding: 1px 4px; border-bottom: 1px solid #eee;'>%1</div>")
                    .arg(originalLines[i]);
         } else if (originalLines[i] != modifiedLines[i]) {
             QString originalLine = originalLines[i].isEmpty() ? "&nbsp;" : originalLines[i];
@@ -148,6 +140,7 @@ QString DiffPreviewDialog::computeSimpleDiff(const QString &original, const QStr
 
 void DiffPreviewDialog::onScrollValueChanged(int value)
 {
+    Q_UNUSED(value)
     if (m_originalScroll->value() != m_modifiedScroll->value()) {
         m_modifiedScroll->setValue(m_originalScroll->value());
     }

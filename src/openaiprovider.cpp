@@ -11,6 +11,7 @@
 #include <QEventLoop>
 #include <QByteArray>
 #include <QRegularExpression>
+#include <KLocalizedString>
 
 OpenAIProvider::OpenAIProvider(const QString &baseUrl, const QString &apiKey, QObject *parent)
     : LLMProvider(parent)
@@ -29,6 +30,55 @@ bool OpenAIProvider::isAvailable()
 
 QStringList OpenAIProvider::availableModels()
 {
+    // Fetch models from the API (synchronous for now)
+    // In a real implementation, this should be async
+    if (m_baseUrl.isEmpty() || m_apiKey.isEmpty()) {
+        return QStringList() << "qwen3-coder-next";
+    }
+    
+    QUrl modelsUrl(m_baseUrl + "/models");
+    QNetworkRequest request(modelsUrl);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    if (!m_apiKey.isEmpty()) {
+        request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
+    }
+    
+    QNetworkAccessManager manager;
+    QEventLoop loop;
+    QNetworkReply *reply = manager.get(request);
+    
+    QObject::connect(reply, &QNetworkReply::finished, &loop, [&loop, &reply]() {
+        reply->deleteLater();
+        loop.quit();
+    });
+    
+    // Wait for response (timeout after 5 seconds)
+    QTimer::singleShot(5000, &loop, [&loop, &reply]() {
+        if (reply->isOpen()) {
+            reply->abort();
+            loop.quit();
+        }
+    });
+    
+    loop.exec();
+    
+    if (reply->error() == QNetworkReply::NoError) {
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        QJsonObject obj = doc.object();
+        QJsonArray modelsArray = obj["data"].toArray();
+        
+        QStringList models;
+        for (const QJsonValue &val : modelsArray) {
+            QJsonObject modelObj = val.toObject();
+            QString modelId = modelObj["id"].toString();
+            if (!modelId.isEmpty()) {
+                models << modelId;
+            }
+        }
+        
+        return models.isEmpty() ? QStringList() << "qwen3-coder-next" : models;
+    }
+    
     return QStringList() << "qwen3-coder-next";
 }
 
@@ -111,7 +161,16 @@ QFuture<LLMResponse> OpenAIProvider::chat(
                     }
                 }
             } else {
-                error = reply->errorString();
+                int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                if (statusCode == 401) {
+                    error = i18n("Authentication failed: Invalid API key or missing authentication");
+                } else if (statusCode == 403) {
+                    error = i18n("Access forbidden: Check your API key and permissions");
+                } else if (statusCode == 404) {
+                    error = i18n("Endpoint not found: Check your base URL");
+                } else {
+                    error = reply->errorString();
+                }
             }
             reply->deleteLater();
             loop.quit();

@@ -2,6 +2,7 @@
 #define WEBSearchTOOL_H
 
 #include "../toolregistry.h"
+#include <KLocalizedString>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
@@ -41,7 +42,7 @@ public:
 
     QString name() const override { return "web_search"; }
     QString description() const override {
-        return "Cerca sul web e restituisce risultati rilevanti con summary";
+        return i18n("Searches the web and returns relevant results with summaries");
     }
 
     QJsonObject parametersSchema() const override {
@@ -51,12 +52,12 @@ public:
         
         QJsonObject queryProp;
         queryProp["type"] = "string";
-        queryProp["description"] = "Query di ricerca (es. 'latest Python 3.12 features')";
+        queryProp["description"] = i18n("Search query (e.g., 'latest Python 3.12 features')");
         properties["query"] = queryProp;
         
         QJsonObject numProp;
         numProp["type"] = "integer";
-        numProp["description"] = "Numero di risultati (default: 5, max: 10)";
+        numProp["description"] = i18n("Number of results (default: 5, max: 10)");
         numProp["default"] = 5;
         properties["num_results"] = numProp;
         
@@ -72,7 +73,7 @@ public:
         if (query.isEmpty()) {
             return QJsonObject{
                 {"success", false},
-                {"error", "Query di ricerca vuota"}
+                {"error", i18n("Empty search query")}
             };
         }
 
@@ -153,7 +154,7 @@ public:
             QJsonArray emptyArray;
             return QJsonObject{
                 {"success", false},
-                {"error", "Nessun risultato trovato"},
+                {"error", i18n("No results found")},
                 {"results", emptyArray}
             };
         }

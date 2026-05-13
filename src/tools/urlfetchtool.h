@@ -1,7 +1,10 @@
 #ifndef URLFETCHTOOL_H
 #define URLFETCHTOOL_H
 
+#include <KLocalizedString>
+
 #include "../toolregistry.h"
+#include <KLocalizedString>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
@@ -39,7 +42,7 @@ public:
 
     QString name() const override { return "url_fetch"; }
     QString description() const override {
-        return "Recupera e estrae contenuto testuale da un URL";
+        return i18n("Retrieves and extracts text content from a URL");
     }
 
     QJsonObject parametersSchema() const override {
@@ -49,7 +52,7 @@ public:
         
         QJsonObject urlProp;
         urlProp["type"] = "string";
-        urlProp["description"] = "URL da recuperare (http/https)";
+        urlProp["description"] = i18n("URL to fetch (http/https)");
         properties["url"] = urlProp;
         
         schema["properties"] = properties;
@@ -63,7 +66,7 @@ public:
         if (urlString.isEmpty()) {
             return QJsonObject{
                 {"success", false},
-                {"error", "URL vuoto"}
+                {"error", i18n("Empty URL")}
             };
         }
         
@@ -72,7 +75,7 @@ public:
         if (!url.isValid() || (url.scheme() != "http" && url.scheme() != "https")) {
             return QJsonObject{
                 {"success", false},
-                {"error", "URL non valido o schema non supportato (solo http/https)"}
+                {"error", i18n("Invalid URL or unsupported scheme (http/https only)")}
             };
         }
         
@@ -81,7 +84,7 @@ public:
         if (host == "localhost" || host == "127.0.0.1" || host.startsWith("192.168.") || host.startsWith("10.")) {
             return QJsonObject{
                 {"success", false},
-                {"error", "Accesso a URL interni bloccato per sicurezza"}
+                {"error", i18n("Access to internal URLs blocked for security")}
             };
         }
 
@@ -115,7 +118,7 @@ public:
             reply->deleteLater();
             return QJsonObject{
                 {"success", false},
-                {"error", QString("Errore di rete: %1").arg(errorMsg)}
+                {"error", i18n("Network error: %1").arg(errorMsg)}
             };
         }
         

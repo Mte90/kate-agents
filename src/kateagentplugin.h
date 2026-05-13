@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QAction>
 #include <QPointer>
+#include <QVariantList>
 
 class AgentLoop;
 class LLMProvider;
@@ -17,12 +18,17 @@ class ContextMenuHandler;
 class KateAgentPlugin : public KTextEditor::Plugin
 {
     Q_OBJECT
-    Q_PLUGIN_METADATA(IID "org.kde.KTextEditor.Plugin" FILE "kateagentplugin.json")
 public:
-    explicit KateAgentPlugin(QObject *p=nullptr, const QVariantList &a=QVariantList());
+    explicit KateAgentPlugin(QObject *parent, const QVariantList & = QVariantList());
     ~KateAgentPlugin() override;
     QObject *createView(KTextEditor::MainWindow *mw) override;
-    KTextEditor::ConfigPage *configPage(int n, QWidget *w) override;
+
+    int configPages() const override;
+
+    KTextEditor::ConfigPage *configPage(int number = 0, QWidget *parent = nullptr) override;
+
+signals:
+    void settingsChanged();
 
 private:
     LLMProvider *m_provider = nullptr;

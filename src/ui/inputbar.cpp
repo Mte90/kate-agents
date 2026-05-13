@@ -1,6 +1,7 @@
 #include "inputbar.h"
 #include "filementionpopup.h"
 #include "agentloop.h"
+#include <KLocalizedString>
 #include <QEvent>
 #include <QKeyEvent>
 #include <QDir>
@@ -9,84 +10,47 @@
 InputBar::InputBar(QWidget *parent)
     : QWidget(parent)
 {
-    QHBoxLayout *mainLayout = new QHBoxLayout(this);
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(5, 5, 5, 5);
+    mainLayout->setSpacing(5);
     
+    // Model selector (Ollama models)
     m_modelCombo = new QComboBox(this);
-    m_modelCombo->setMinimumWidth(150);
-    m_modelCombo->addItem("Write");
-    m_modelCombo->addItem("Ask");
-    m_modelCombo->addItem("Minimal");
-    connect(m_modelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, [this](int) { emit modelChanged(m_modelCombo->currentText()); });
-    
-    m_inputEdit = new QLineEdit(this);
-    m_inputEdit->setPlaceholderText("Scrivi un messaggio all'agente... (@ per tool)");
-    m_inputEdit->setMinimumHeight(36);
-    connect(m_inputEdit, &QLineEdit::returnPressed, this, &InputBar::onReturnPressed);
-    connect(m_inputEdit, &QLineEdit::textChanged, this, &InputBar::onTextChanged);
-    
-    m_sendButton = new QPushButton("Invia", this);
-    m_sendButton->setMinimumWidth(80);
-    m_sendButton->setMinimumHeight(36);
-    connect(m_sendButton, &QPushButton::clicked, this, &InputBar::onSendClicked);
-    
-    m_statusLabel = new QLabel(this);
-    m_statusLabel->setMinimumWidth(60);
-    m_statusLabel->setAlignment(Qt::AlignCenter);
-    
+    m_modelCombo->addItem("Loading models...", -1);
+    m_modelCombo->setToolTip(i18n("Select the Ollama model to use for chat"));
     mainLayout->addWidget(m_modelCombo);
-    mainLayout->addWidget(m_inputEdit, 1);
-    mainLayout->addWidget(m_statusLabel);
-    mainLayout->addWidget(m_sendButton);
+    connect(m_modelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int) { 
+                if (m_modelCombo->currentIndex() >= 0) {
+                    emit modelChanged(m_modelCombo->currentText()); 
+                }
+            });
     
+    // Text input area (multiline textarea)
+    m_inputEdit = new QTextEdit(this);
+    m_inputEdit->setPlaceholderText(i18n("Scrivi un messaggio all'agente... (@ per tool)"));
+    m_inputEdit->setMinimumHeight(60);
+    m_inputEdit->setAcceptRichText(false);
+    connect(m_inputEdit, &QTextEdit::textChanged, this, &InputBar::onTextChanged);
+    mainLayout->addWidget(m_inputEdit, 1);
+    
+    // Bottom row: send button and profile selector
+    QHBoxLayout *bottomRow = new QHBoxLayout();
+    
+    m_sendButton = new QPushButton(i18n("Invia"), this);
+    connect(m_sendButton, &QPushButton::clicked, this, &InputBar::onSendClicked);
+    bottomRow->addWidget(m_sendButton);
+    
+    // Profile selector (Write/Ask/Minimal)
     m_profileCombo = new QComboBox(this);
-    m_profileCombo->setMinimumWidth(120);
-    m_profileCombo->addItem("Write");
-    m_profileCombo->addItem("Ask");
-    m_profileCombo->addItem("Minimal");
+    m_profileCombo->addItem(i18n("Write"));
+    m_profileCombo->addItem(i18n("Ask"));
+    m_profileCombo->addItem(i18n("Minimal"));
     connect(m_profileCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &InputBar::onProfileChanged);
-    mainLayout->addWidget(m_profileCombo);
+    bottomRow->addWidget(m_profileCombo);
     
-    setStyleSheet(R"(
-        InputBar {
-            background: #2d2d2d;
-            border-top: 1px solid #424242;
-        }
-        QLineEdit {
-            background: #1e1e1e;
-            color: #ffffff;
-            border: 1px solid #424242;
-            border-radius: 4px;
-            padding: 6px;
-            font-size: 13px;
-        }
-        QLineEdit:focus {
-            border: 1px solid #2196f3;
-        }
-        QPushButton {
-            background: #1976d2;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-weight: bold;
-            padding: 6px 12px;
-        }
-        QPushButton:hover {
-            background: #1e88e5;
-        }
-        QPushButton:pressed {
-            background: #1565c0;
-        }
-        QComboBox {
-            background: #1e1e1e;
-            color: #ffffff;
-            border: 1px solid #424242;
-            border-radius: 4px;
-            padding: 4px;
-        }
-    )");
+    mainLayout->addLayout(bottomRow);
     
     // Initialize FileMentionPopup
     m_filePopup = new FileMentionPopup(this);
@@ -95,7 +59,7 @@ InputBar::InputBar(QWidget *parent)
     // Install event filter for Tab key handling
     m_inputEdit->installEventFilter(this);
     
-// Set default system prompt based on selected profile
+    // Set default system prompt based on selected profile
     QString profile = m_profileCombo->currentText();
     AgentProfile profileEnum = stringToProfile(profile);
     QString prompt = systemPromptForProfile(profileEnum);
@@ -115,7 +79,7 @@ void InputBar::setModels(const QStringList &models)
 
 void InputBar::onSendClicked()
 {
-    QString text = m_inputEdit->text().trimmed();
+    QString text = m_inputEdit->toPlainText().trimmed();
     if (!text.isEmpty()) {
         emit sendMessage(text);
     }
@@ -128,14 +92,14 @@ void InputBar::onReturnPressed()
     }
 }
 
-void InputBar::onTextChanged(const QString &text)
+void InputBar::onTextChanged()
 {
-    m_sendButton->setEnabled(!text.trimmed().isEmpty());
+    m_sendButton->setEnabled(!m_inputEdit->toPlainText().trimmed().isEmpty());
 }
 
 void InputBar::insertFilePath(const QString &filePath)
 {
-    QString text = m_inputEdit->text();
+    QString text = m_inputEdit->toPlainText();
     int atIndex = text.lastIndexOf('@');
     
     if (atIndex >= 0) {
@@ -150,8 +114,10 @@ void InputBar::insertFilePath(const QString &filePath)
         after = after.mid(endPos);
         QString newText = before + filePath + " " + after;
         
-        m_inputEdit->setText(newText);
-        m_inputEdit->setCursorPosition(atIndex + filePath.length() + 1);
+        m_inputEdit->setPlainText(newText);
+        QTextCursor cursor = m_inputEdit->textCursor();
+        cursor.setPosition(atIndex + filePath.length() + 1);
+        m_inputEdit->setTextCursor(cursor);
         m_filePopup->hide();
     }
 }
@@ -162,33 +128,17 @@ void InputBar::setRunningState(bool running)
     if (running) {
         m_sendButton->setText("⬛ Stop");
         m_inputEdit->setEnabled(false);
-        m_statusLabel->setText("🔄");
     } else {
         m_sendButton->setText("Invia");
         m_inputEdit->setEnabled(true);
         m_inputEdit->setFocus();
-        m_statusLabel->setText("✅");
         m_filePopup->hidePopup();
     }
-}
-
-void InputBar::onInputTextChanged(const QString &text)
-{
-    if (!text.contains('@') || text.mid(text.indexOf('@') + 1).isEmpty()) {
-        m_filePopup->hidePopup();
-        return;
-    }
-
-    m_filePopup->populateFromDirectory("/home/archimede/Desktop/projects/kate-agents");
-    m_filePopup->filterPaths(text.mid(text.indexOf('@') + 1));
-
-    int cursorPos = m_inputEdit->cursorPosition();
-    QPoint pos = m_inputEdit->mapToGlobal(QPoint(0, m_inputEdit->height()));
-    m_filePopup->showAt(pos);
 }
 
 void InputBar::onProfileChanged(int index)
 {
+    Q_UNUSED(index)
     QString profile = m_profileCombo->currentText();
     AgentProfile profileEnum = stringToProfile(profile);
     QString prompt = systemPromptForProfile(profileEnum);

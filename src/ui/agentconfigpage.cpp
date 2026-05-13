@@ -48,11 +48,19 @@ AgentConfigPage::AgentConfigPage(QWidget *parent, KateAgentPlugin *plugin)
     // Model Selection
     {
         auto *hl = new QHBoxLayout;
-        auto label = new QLabel(i18n("Model"));
+        auto label = new QLabel(i18n("Default Model for Sidebar:"));
         hl->addWidget(label);
         m_modelComboBox = new QComboBox(this);
+        m_modelComboBox->setToolTip(i18n("This model will be used by default in the chat sidebar. "
+                                        "You can change it anytime in the sidebar dropdown."));
         hl->addWidget(m_modelComboBox);
         layout->addLayout(hl);
+        
+        // Info label
+        auto *infoLabel = new QLabel(i18n("ℹ️ The model list is fetched from the Ollama server at the Base URL above."));
+        infoLabel->setWordWrap(true);
+        infoLabel->setStyleSheet("color: #666; font-style: italic; margin-left: 10px;");
+        layout->addWidget(infoLabel);
     }
     
     // System Prompt
@@ -65,11 +73,6 @@ AgentConfigPage::AgentConfigPage(QWidget *parent, KateAgentPlugin *plugin)
         hl->addWidget(m_systemPromptEdit);
         layout->addLayout(hl);
     }
-
-    // Buffer Context
-    m_bufferContextCheckbox = new QCheckBox(i18n("Include editor context in prompts"), this);
-    layout->addWidget(m_bufferContextCheckbox);
-    connect(m_bufferContextCheckbox, &QCheckBox::checkStateChanged, this, &AgentConfigPage::changed);
 
     layout->addStretch();
     
@@ -122,8 +125,8 @@ void AgentConfigPage::fetchModelList()
                         return a.toObject()["id"].toString().toLower() < b.toObject()["id"].toString().toLower();
                     });
                     
-                    QString currentModel = m_modelComboBox->currentText();
-                    m_modelComboBox->clear();
+                    // Use saved model if combo box is empty (first load), otherwise keep current selection
+                    QString modelToSelect = m_savedModel.isEmpty() ? currentModel : m_savedModel;
                     
                     int modelSelected = -1;
                     int idx = 0;
@@ -132,7 +135,7 @@ void AgentConfigPage::fetchModelList()
                         if (modelObj.contains("id")) {
                             QString modelName = modelObj["id"].toString();
                             m_modelComboBox->addItem(modelName);
-                            if (modelName == currentModel) {
+                            if (modelName == modelToSelect) {
                                 modelSelected = idx;
                             }
                             idx++;
@@ -157,17 +160,23 @@ void AgentConfigPage::fetchModelList()
 
 QString AgentConfigPage::name() const
 {
-    return i18n("Kate Agent");
+    QString result = i18n("Kate Agent");
+    qDebug() << "[AgentConfigPage] name() called - returning:" << result;
+    return result;
 }
 
 QString AgentConfigPage::fullName() const
 {
-    return i18n("Kate Agent Settings");
+    QString result = i18n("Kate Agent Settings");
+    qDebug() << "[AgentConfigPage] fullName() called - returning:" << result;
+    return result;
 }
 
 QIcon AgentConfigPage::icon() const
 {
-    return QIcon::fromTheme(QStringLiteral("preferences-system"));
+    QIcon result = QIcon::fromTheme(QStringLiteral("preferences-system"));
+    qDebug() << "[AgentConfigPage] icon() called - returning:" << result;
+    return result;
 }
 
 void AgentConfigPage::apply()
@@ -177,15 +186,19 @@ void AgentConfigPage::apply()
     group.writeEntry("BaseUrl", m_baseUrlEdit->text());
     group.writeEntry("Model", m_modelComboBox->currentText());
     group.writeEntry("SystemPrompt", m_systemPromptEdit->toPlainText());
-    group.writeEntry("BufferContextEnabled", m_bufferContextCheckbox->isChecked());
     group.sync();
 
-    if (m_plugin) {
+    // Reload config and update provider
+    if (m_plugin && m_plugin->m_config && m_plugin->m_provider) {
         m_plugin->m_config->load();
         auto providerCfg = m_plugin->m_config->getProviderConfig(m_plugin->m_config->getActiveProvider());
-        delete m_plugin->m_provider;
-        m_plugin->m_provider = new OpenAIProvider(providerCfg.baseUrl, providerCfg.apiKey, m_plugin);
-        m_plugin->m_agentLoop->setProvider(m_plugin->m_provider);
+        
+        if (auto *openaiProvider = qobject_cast<OpenAIProvider*>(m_plugin->m_provider)) {
+            openaiProvider->setBaseUrl(providerCfg.baseUrl);
+            openaiProvider->setApiKey(providerCfg.apiKey);
+        }
+        
+        emit m_plugin->settingsChanged();
     }
 }
 
@@ -195,7 +208,6 @@ void AgentConfigPage::defaults()
     m_baseUrlEdit->setText("http://localhost:11434/v1");
     m_modelComboBox->setCurrentIndex(0);
     m_systemPromptEdit->setPlainText("You are a helpful coding assistant. Provide concise, accurate code and explanations.");
-    m_bufferContextCheckbox->setChecked(true);
 }
 
 void AgentConfigPage::reset()
@@ -209,7 +221,7 @@ void AgentConfigPage::loadSettings()
     
     QString apiKey = group.readEntry("ApiKey", QString());
     QString baseUrl = group.readEntry("BaseUrl", "http://localhost:11434/v1");
-    QString model = group.readEntry("Model", QString());
+    m_savedModel = group.readEntry("Model", QString());  // Salva il modello da selezionare dopo
     QString systemPrompt = group.readEntry("SystemPrompt", QString());
     bool bufferContextEnabled = group.readEntry("BufferContextEnabled", true);
 
@@ -235,5 +247,3 @@ void AgentConfigPage::updateSettings()
     // Emitting the base class signal for config changes
     KTextEditor::ConfigPage::changed();
 }
-
-#include "agentconfigpage.moc"

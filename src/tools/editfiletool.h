@@ -2,6 +2,7 @@
 #define EDITFILETOOL_H
 
 #include "../toolregistry.h"
+#include <KLocalizedString>
 #include "../checkpointmanager.h"
 #include "../ui/diffpreviewdialog.h"
 #include <QFile>
@@ -16,7 +17,7 @@ public:
 
     QString name() const override { return "edit_file"; }
     QString description() const override {
-        return "Modifica un file sostituendo old_text con new_text.";
+        return i18n("Edits a file by replacing old_text with new_text.");
     }
 
     QJsonObject parametersSchema() const override {
@@ -26,22 +27,22 @@ public:
         
         QJsonObject pathProp;
         pathProp["type"] = "string";
-        pathProp["description"] = "Percorso del file da modificare";
+        pathProp["description"] = i18n("Path of the file to edit");
         properties["path"] = pathProp;
         
         QJsonObject oldTextProp;
         oldTextProp["type"] = "string";
-        oldTextProp["description"] = "Testo esistente da cercare";
+        oldTextProp["description"] = i18n("Existing text to find");
         properties["old_text"] = oldTextProp;
         
         QJsonObject newTextProp;
         newTextProp["type"] = "string";
-        newTextProp["description"] = "Nuovo testo da inserire";
+        newTextProp["description"] = i18n("New text to insert");
         properties["new_text"] = newTextProp;
         
         QJsonObject replaceAllProp;
         replaceAllProp["type"] = "boolean";
-        replaceAllProp["description"] = "Se true, sostituisci tutte le occorrenze";
+        replaceAllProp["description"] = i18n("If true, replace all occurrences");
         replaceAllProp["default"] = false;
         properties["replace_all"] = replaceAllProp;
         
@@ -59,7 +60,7 @@ public:
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             return QJsonObject{
-                {"error", "Impossibile aprire il file: " + path},
+                {"error", i18n("Cannot open file: ") + path},
                 {"success", false}
             };
         }
@@ -71,14 +72,14 @@ public:
         int count = content.count(oldText);
         if (count == 0) {
             return QJsonObject{
-                {"error", "Testo da sostituire non trovato nel file"},
+                {"error", i18n("Text to replace not found in file")},
                 {"success", false}
             };
         }
         
         if (!replaceAll && count > 1) {
             return QJsonObject{
-                {"warning", "Trovate " + QString::number(count) + " occorrenze. Usa replace_all=true per sostituirle tutte."},
+                {"warning", i18n("Found N occurrences. Use replace_all=true to replace all.").replace("N", QString::number(count))},
                 {"success", false}
             };
         }
@@ -86,7 +87,7 @@ public:
         QString backupPath = CheckpointManager::createBackup(path);
         if (backupPath.isEmpty()) {
             return QJsonObject{
-                {"error", "Impossibile creare il backup del file: " + path},
+                {"error", i18n("Cannot create backup for file: ") + path},
                 {"success", false}
             };
         }
@@ -108,7 +109,7 @@ public:
         // User accepted - write the file
         if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
             return QJsonObject{
-                {"error", "Impossibile scrivere il file: " + path},
+                {"error", i18n("Cannot write to file: ") + path},
                 {"success", false}
             };
         }

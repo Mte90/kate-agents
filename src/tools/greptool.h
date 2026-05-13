@@ -2,6 +2,7 @@
 #define GREPTOOL_H
 
 #include "../toolregistry.h"
+#include <KLocalizedString>
 #include <QDir>
 #include <QFile>
 #include <QTextStream>
@@ -16,7 +17,7 @@ public:
 
     QString name() const override { return "grep"; }
     QString description() const override {
-        return "Cerca nei file del progetto usando un pattern regex.";
+        return i18n("Searches files in the project using a regex pattern.");
     }
 
     QJsonObject parametersSchema() const override {
@@ -26,22 +27,22 @@ public:
         
         QJsonObject patternProp;
         patternProp["type"] = "string";
-        patternProp["description"] = "Pattern regex da cercare";
+        patternProp["description"] = i18n("Regex pattern to search for");
         properties["pattern"] = patternProp;
         
         QJsonObject pathProp;
         pathProp["type"] = "string";
-        pathProp["description"] = "Directory in cui cercare (default: .)";
+        pathProp["description"] = i18n("Directory to search in (default: .)");
         properties["path"] = pathProp;
         
         QJsonObject includeProp;
         includeProp["type"] = "string";
-        includeProp["description"] = "Glob pattern per inclusione file";
+        includeProp["description"] = i18n("Glob pattern for file inclusion");
         properties["include"] = includeProp;
         
         QJsonObject maxResultsProp;
         maxResultsProp["type"] = "integer";
-        maxResultsProp["description"] = "Massimo numero di risultati";
+        maxResultsProp["description"] = i18n("Maximum number of results");
         maxResultsProp["default"] = 50;
         properties["max_results"] = maxResultsProp;
         
@@ -59,7 +60,7 @@ public:
         QRegularExpression regex(pattern);
         if (!regex.isValid()) {
             return QJsonObject{
-                {"error", "Pattern regex non valido: " + regex.errorString()},
+                {"error", i18n("Invalid regex pattern: ") + regex.errorString()},
                 {"success", false}
             };
         }

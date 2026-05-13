@@ -4,6 +4,9 @@
 #include "../llmprovider.h"
 #include "../configmanager.h"
 #include "../permissionmanager.h"
+#include <KLocalizedString>
+#include <KConfigGroup>
+#include <KSharedConfig>
 
 #include <QDebug>
 #include <QJsonObject>
@@ -30,38 +33,11 @@ void AgentPanel::setupUi()
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
     
-    setStyleSheet(R"(
-        AgentPanel {
-            background: #121212;
-            color: #e0e0e0;
-        }
-    )");
-    
     m_tabs = new QTabWidget(this);
     m_tabs->setDocumentMode(true);
     
     m_threadView = new ThreadView(m_tabs);
-    m_tabs->addTab(m_threadView, "💬 Chat");
-    
-    QWidget *toolsTab = new QWidget(m_tabs);
-    QVBoxLayout *toolsLayout = new QVBoxLayout(toolsTab);
-    QLabel *toolsLabel = new QLabel("Tool disponibili:\n\n• read_file - Legge un file\n• grep - Cerca nel codice\n• edit_file - Modifica un file\n• terminal - Esegue comandi", toolsTab);
-    toolsLabel->setTextFormat(Qt::PlainText);
-    toolsLayout->addWidget(toolsLabel);
-    toolsLayout->addStretch();
-    m_tabs->addTab(toolsTab, "🔧 Tool");
-    
-    QWidget *settingsTab = new QWidget(m_tabs);
-    QVBoxLayout *settingsLayout = new QVBoxLayout(settingsTab);
-    QLabel *settingsLabel = new QLabel(
-        QString("Provider: %1\nModello: %2\nMax iterazioni: %3")
-            .arg(m_config->getActiveProvider())
-            .arg(m_config->getActiveModel())
-            .arg(m_config->getMaxIterations()), 
-        settingsTab);
-    settingsLayout->addWidget(settingsLabel);
-    settingsLayout->addStretch();
-    m_tabs->addTab(settingsTab, "⚙️ Impostazioni");
+    m_tabs->addTab(m_threadView, i18n("Chat"));
     
     mainLayout->addWidget(m_tabs, 1);
     
@@ -73,10 +49,19 @@ void AgentPanel::setupUi()
         m_inputBar->setAgentLoop(m_agent);
     }
     
+    // Load models from provider
     if (m_provider) {
         QStringList models = m_provider->availableModels();
         if (!models.isEmpty()) {
             m_inputBar->setModels(models);
+            
+            // Load default model from settings
+            KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
+            QString defaultModel = group.readEntry("Model", QString());
+            
+            if (!defaultModel.isEmpty() && models.contains(defaultModel)) {
+                m_inputBar->setCurrentModel(defaultModel);
+            }
         }
     }
 }
@@ -105,9 +90,7 @@ void AgentPanel::connectSignals()
 
 QAction *AgentPanel::createAction()
 {
-    QAction *action = new QAction("Kate Agent", this);
-    action->setText("💻 Kate Agent");
-    action->setIconText("💻");
+    QAction *action = new QAction(i18n("Kate Agent"), this);
     return action;
 }
 
@@ -167,7 +150,7 @@ void AgentPanel::onTurnCompleted()
 
 void AgentPanel::onError(const QString &error)
 {
-    m_threadView->appendHtml(QString("<div class='tool-result error'>❌ Errore: %1</div>").arg(error));
+    m_threadView->appendHtml(QString("<div class='tool-result error'>%1</div>").arg(i18n("Error: %1").arg(error)));
 }
 
 void AgentPanel::onRunningChanged(bool running)
@@ -178,4 +161,23 @@ void AgentPanel::onRunningChanged(bool running)
 void AgentPanel::onPermissionRequested(const QString &toolName)
 {
     qDebug() << "AgentPanel: Permission requested for:" << toolName;
+}
+
+void AgentPanel::reloadModels()
+{
+    qDebug() << "AgentPanel: Reloading models from provider";
+    if (m_provider) {
+        QStringList models = m_provider->availableModels();
+        if (!models.isEmpty()) {
+            m_inputBar->setModels(models);
+            
+            // Reload default model from settings
+            KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
+            QString defaultModel = group.readEntry("Model", QString());
+            
+            if (!defaultModel.isEmpty() && models.contains(defaultModel)) {
+                m_inputBar->setCurrentModel(defaultModel);
+            }
+        }
+    }
 }

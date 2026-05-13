@@ -66,14 +66,28 @@ void ContextMenuHandler::onAskAgentAboutThis()
     int cursorCol = view->cursorPosition().column();
     
     QString context;
-    int startLine = qMax(0, cursorLine - 5);
-    int endLine = qMin(view->document()->lastLine(), cursorLine + 5);
+    auto cursorPos = view->cursorPosition();
     
-    for (int line = startLine; line <= endLine; ++line) {
-        if (line == cursorLine) {
+    // Get surrounding context using document text range
+    int start = qMax(0, cursorPos.line() - 5);
+    int end = cursorPos.line() + 5;
+    
+    // Use document->text() to get lines - it takes (startLine, startCol, endLine, endCol)
+    for (int i = start; i <= end; ++i) {
+        QString line;
+        // Safely get line text - avoid broken APIs
+        if (i >= 0) {
+            // Get line as plain text using KTextEditor::Range
+            KTextEditor::Range range(i, 0, i, 1);
+            line = view->document()->text(range).trimmed();
+        }
+        if (line.isEmpty()) {
+            line = "...";
+        }
+        if (i == cursorPos.line()) {
             context += ">>> ";
         }
-        context += view->document()->line(line) + "\n";
+        context += line + "\n";
     }
 
     QString message = QString("Selected text:\n```\n%1\n```\n\nContext around cursor (line %2, col %3):\n```\n%4\n```")
@@ -82,5 +96,5 @@ void ContextMenuHandler::onAskAgentAboutThis()
         .arg(cursorCol)
         .arg(context);
 
-    m_agentLoop->addUserMessage(message);
+    m_agentLoop->addUserMessage(QString(), message);
 }

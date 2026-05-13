@@ -41,6 +41,11 @@ public:
     void setBaseUrl(const QString &url) { m_baseUrl = url; }
     void setApiKey(const QString &key) { m_apiKey = key; }
     void setDefaultModel(const QString &model) { m_defaultModel = model; }
+    
+    void updateConfig(const QString &baseUrl, const QString &apiKey) {
+        m_baseUrl = baseUrl;
+        m_apiKey = apiKey;
+    }
 
 private:
     QString m_name;

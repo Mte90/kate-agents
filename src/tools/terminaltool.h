@@ -1,7 +1,10 @@
 #ifndef TERMINALTOOL_H
 #define TERMINALTOOL_H
 
+#include <KLocalizedString>
+
 #include "../toolregistry.h"
+#include <KLocalizedString>
 #include <QProcess>
 #include <QTimer>
 #include <QEventLoop>
@@ -54,7 +57,7 @@ public:
 
     QString name() const override { return "terminal"; }
     QString description() const override {
-        return "Esegue un comando shell e restituisce stdout + stderr.";
+        return i18n("Executes a shell command and returns stdout + stderr.");
     }
 
     QJsonObject parametersSchema() const override {
@@ -64,17 +67,17 @@ public:
         
         QJsonObject cmdProp;
         cmdProp["type"] = "string";
-        cmdProp["description"] = "Comando shell da eseguire";
+        cmdProp["description"] = i18n("Shell command to execute");
         properties["command"] = cmdProp;
         
         QJsonObject wdProp;
         wdProp["type"] = "string";
-        wdProp["description"] = "Directory di lavoro";
+        wdProp["description"] = i18n("Working directory");
         properties["working_directory"] = wdProp;
         
         QJsonObject timeoutProp;
         timeoutProp["type"] = "integer";
-        timeoutProp["description"] = "Timeout in secondi (default: 60, max: 300)";
+        timeoutProp["description"] = i18n("Timeout in seconds (default: 60, max: 300)");
         timeoutProp["default"] = 60;
         properties["timeout_seconds"] = timeoutProp;
         

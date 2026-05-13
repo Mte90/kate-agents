@@ -48,6 +48,7 @@ QSize GhostTextProvider::inlineNoteSize(const KTextEditor::InlineNote &note) con
 void GhostTextProvider::paintInlineNote(const KTextEditor::InlineNote &note, QPainter &painter,
                                         Qt::LayoutDirection direction) const
 {
+    Q_UNUSED(direction)
     if (!m_hasSuggestion) {
         return;
     }
