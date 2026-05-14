@@ -18,6 +18,7 @@
 #include <QDir>
 #include <QJsonDocument>
 #include <QDate>
+#include <QDockWidget>
 
 AgentPanel::AgentPanel(AgentLoop *agent, ToolRegistry *registry,
                        LLMProvider *provider, ConfigManager *config,
@@ -74,9 +75,26 @@ void AgentPanel::setupUi()
     newChatBtn->setStyleSheet("QPushButton { font-weight: bold; font-size: 16px; }");
     connect(newChatBtn, &QPushButton::clicked, this, &AgentPanel::onNewChat);
     
-    newChatLayout->addWidget(newChatBtn);
-    newChatLayout->addStretch();
+    // Hide sidebar button
+    QPushButton *hideBtn = new QPushButton();
+    hideBtn->setFixedSize(16, 16);
+    hideBtn->setToolTip(i18n("Hide sidebar"));
+    hideBtn->setStyleSheet("QPushButton { font-size: 10px; border: none; } QPushButton:hover { background-color: palette(highlight); color: palette(highlighted-text); border-radius: 2px; }");
+    hideBtn->setText(QStringLiteral("\u2192"));  // Right arrow to indicate collapse
+    connect(hideBtn, &QPushButton::clicked, this, [this]() {
+        if (parentWidget() && parentWidget()->parentWidget()) {
+            auto *dock = qobject_cast<QDockWidget*>(parentWidget()->parentWidget());
+            if (dock) {
+                dock->hide();
+            }
+        }
+    });
     
+    newChatLayout->addWidget(hideBtn);
+    newChatLayout->addStretch();
+    newChatLayout->addWidget(newChatBtn);
+    
+    mainLayout->addWidget(newChatWidget);
     mainLayout->addWidget(m_tabs, 1);
     
     m_inputBar = new InputBar(this);

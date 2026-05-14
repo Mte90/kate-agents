@@ -28,6 +28,7 @@
 #include <QDockWidget>
 #include <QMainWindow>
 #include <QDebug>
+#include <QTimer>
 
 K_PLUGIN_FACTORY_WITH_JSON(KateAgentPluginFactory, "kateagentplugin.json", registerPlugin<KateAgentPlugin>();)
 
@@ -42,31 +43,42 @@ public:
         , m_mainWindow(mainwindow)
     {
         setComponentName("kateagent", i18n("Kate Agent"));
+        qDebug() << "AgentGuiClient: Constructor starting";
+        qDebug() << "AgentGuiClient: setComponentName done";
         
-        // Create the actual panel
+        qDebug() << "AgentGuiClient: Creating AgentPanel...";
         m_panel = new AgentPanel(plugin->m_agentLoop, plugin->m_registry, 
                                  plugin->m_provider, plugin->m_config, 
                                  plugin->m_permissions);
+        qDebug() << "AgentGuiClient: AgentPanel created";
         
-        // Create action collection
+        qDebug() << "AgentGuiClient: Creating action collection...";
         auto ac = actionCollection();
+        qDebug() << "AgentGuiClient: Action collection created";
         
-        // Action to toggle dock visibility
+        qDebug() << "AgentGuiClient: Creating toggle action...";
         auto toggleAction = ac->addAction("kateagent-toggle");
         toggleAction->setText(i18n("Toggle Kate Agent Panel"));
         toggleAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_A));
         toggleAction->setIcon(QIcon::fromTheme("dialog-information"));
+        qDebug() << "AgentGuiClient: Toggle action created";
+        
         connect(toggleAction, &QAction::triggered, this, [this]() {
+            qDebug() << "AgentGuiClient: Toggle action triggered";
             if (!m_dock) {
+                qDebug() << "AgentGuiClient: Creating dock widget...";
                 m_dock = new QDockWidget(tr("Kate Agent"), m_mainWindow->window());
                 m_dock->setObjectName("KateAgentDock");
                 m_dock->setWidget(m_panel);
                 m_dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable);
                 QMainWindow *mainWindow = qobject_cast<QMainWindow*>(m_mainWindow->window());
                 if (mainWindow) {
+                    qDebug() << "AgentGuiClient: Adding dock to main window...";
                     mainWindow->addDockWidget(Qt::RightDockWidgetArea, m_dock);
-                    // Show dock widget immediately
                     m_dock->show();
+                    qDebug() << "AgentGuiClient: Dock shown";
+                } else {
+                    qDebug() << "AgentGuiClient: MainWindow cast failed!";
                 }
             }
             if (m_dock->isVisible()) {
@@ -77,26 +89,41 @@ public:
                 m_dock->activateWindow();
             }
         });
-        
-        // Show dock widget immediately on plugin load
-        m_dock = new QDockWidget(tr("Kate Agent"), m_mainWindow->window());
-        m_dock->setObjectName("KateAgentDock");
-        m_dock->setWidget(m_panel);
-        m_dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable);
-        QMainWindow *mainWindow = qobject_cast<QMainWindow*>(m_mainWindow->window());
-        if (mainWindow) {
-            mainWindow->addDockWidget(Qt::RightDockWidgetArea, m_dock);
-            m_dock->show();
-        }
-        
-        // Install gui client
+        qDebug() << "AgentGuiClient: Toggle action connected";
+
+        qDebug() << "AgentGuiClient: Installing GUI client...";
         m_mainWindow->guiFactory()->addClient(this);
+        qDebug() << "AgentGuiClient: GUI client installed";
+
+        // Auto-show dock widget after event loop starts (deferred to avoid Kate init crash)
+        QTimer::singleShot(0, this, [this]() {
+            qDebug() << "AgentGuiClient: Auto-showing dock widget";
+            if (!m_dock) {
+                m_dock = new QDockWidget(i18n("Kate Agent"), m_mainWindow->window());
+                m_dock->setObjectName("KateAgentDock");
+                m_dock->setWidget(m_panel);
+                m_dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable);
+                QMainWindow *mainWindow = qobject_cast<QMainWindow*>(m_mainWindow->window());
+                if (mainWindow) {
+                    mainWindow->addDockWidget(Qt::RightDockWidgetArea, m_dock);
+                }
+            }
+            m_dock->show();
+            m_dock->raise();
+            qDebug() << "AgentGuiClient: Dock widget auto-shown";
+        });
+
+        qDebug() << "AgentGuiClient: Constructor complete";
     }
     
     ~AgentGuiClient() override {
+        qDebug() << "AgentGuiClient: Destructor starting";
         if (m_mainWindow) {
+            qDebug() << "AgentGuiClient: Removing GUI client...";
             m_mainWindow->guiFactory()->removeClient(this);
+            qDebug() << "AgentGuiClient: GUI client removed";
         }
+        qDebug() << "AgentGuiClient: Destructor complete";
     }
     
     QWidget* panel() const { return m_panel; }
@@ -150,23 +177,8 @@ QObject *KateAgentPlugin::createView(KTextEditor::MainWindow *mw)
 {
     qDebug() << "KateAgentPlugin: createView starting";
     
-    // Set main window reference for editor context access
     m_agentLoop->setMainWindow(mw);
     
-    // Create context menu handler
-    m_contextMenuHandler = new ContextMenuHandler(m_agentLoop, this);
-    
-    // Install context menu for existing views
-    for (auto *view : mw->views()) {
-        m_contextMenuHandler->installContextMenu(view);
-    }
-    
-    // Connect view created signal to install context menu for new views
-    connect(mw, &KTextEditor::MainWindow::viewCreated, this, [this](KTextEditor::View *view) {
-        m_contextMenuHandler->installContextMenu(view);
-    });
-    
-    // Return GUI client (like kate-ollama does)
     return new AgentGuiClient(this, mw);
 }
 

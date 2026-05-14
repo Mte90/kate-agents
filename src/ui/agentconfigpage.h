@@ -6,7 +6,6 @@
 #include <QTextEdit>
 #include <QComboBox>
 #include <QLabel>
-#include <QCheckBox>
 #include <QNetworkAccessManager>
 
 class KateAgentPlugin;
@@ -40,7 +39,6 @@ private:
     QLineEdit *m_baseUrlEdit;
     QComboBox *m_modelComboBox;
     QTextEdit *m_systemPromptEdit;
-    QCheckBox *m_bufferContextCheckbox;
     QLabel *m_infoLabel;
     QNetworkAccessManager *m_networkManager;
     QString m_savedModel;  // Model saved from settings to be selected after model list loads

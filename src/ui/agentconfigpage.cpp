@@ -57,7 +57,7 @@ AgentConfigPage::AgentConfigPage(QWidget *parent, KateAgentPlugin *plugin)
         layout->addLayout(hl);
         
         // Info label
-        auto *infoLabel = new QLabel(i18n("ℹ️ The model list is fetched from the Ollama server at the Base URL above."));
+        auto *infoLabel = new QLabel(i18n("ℹ️ The model list is fetched from the OpenAI provider at the Base URL above."));
         infoLabel->setWordWrap(true);
         infoLabel->setStyleSheet("color: #666; font-style: italic; margin-left: 10px;");
         layout->addWidget(infoLabel);
@@ -224,7 +224,6 @@ void AgentConfigPage::loadSettings()
     QString baseUrl = group.readEntry("BaseUrl", "http://localhost:11434/v1");
     m_savedModel = group.readEntry("Model", QString());  // Salva il modello da selezionare dopo
     QString systemPrompt = group.readEntry("SystemPrompt", QString());
-    bool bufferContextEnabled = group.readEntry("BufferContextEnabled", true);
 
     if (systemPrompt.isEmpty()) {
         defaults();
@@ -233,7 +232,6 @@ void AgentConfigPage::loadSettings()
         m_baseUrlEdit->setText(baseUrl);
         m_systemPromptEdit->setPlainText(systemPrompt);
     }
-    m_bufferContextCheckbox->setChecked(bufferContextEnabled);
     
     fetchModelList();
 }
