@@ -4,7 +4,6 @@
 #include "../llmprovider.h"
 #include "../configmanager.h"
 #include "../permissionmanager.h"
-#include "../threadjson.h"
 #include <KLocalizedString>
 #include <KConfigGroup>
 #include <KSharedConfig>
@@ -13,12 +12,14 @@
 #include <QJsonObject>
 #include <QTimer>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QPushButton>
 #include <QStandardPaths>
 #include <QDir>
 #include <QJsonDocument>
 #include <QDate>
 #include <QDockWidget>
+#include <QRegularExpression>
 
 AgentPanel::AgentPanel(AgentLoop *agent, ToolRegistry *registry,
                        LLMProvider *provider, ConfigManager *config,
@@ -58,9 +59,20 @@ void AgentPanel::setupUi()
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
     
-    m_tabs = new QTabWidget(this);
+    m_tabs = new CloseableTabWidget(this);
     m_tabs->setDocumentMode(true);
     m_tabs->setTabsClosable(true);
+    m_tabs->setMovable(true);
+    
+    // Connect middle-click to close tab
+    connect(m_tabs, &CloseableTabWidget::middleTabClicked, this, [this](int index) {
+        closeChatTab(index);
+    });
+    
+    // Connect tab double-click for renaming
+    connect(m_tabs->tabBar(), &QTabBar::tabBarDoubleClicked, this, [this](int index) {
+        renameChatTab(index);
+    });
     
     createNewChatTab();
     
@@ -82,11 +94,14 @@ void AgentPanel::setupUi()
     hideBtn->setStyleSheet("QPushButton { font-size: 10px; border: none; } QPushButton:hover { background-color: palette(highlight); color: palette(highlighted-text); border-radius: 2px; }");
     hideBtn->setText(QStringLiteral("\u2192"));  // Right arrow to indicate collapse
     connect(hideBtn, &QPushButton::clicked, this, [this]() {
-        if (parentWidget() && parentWidget()->parentWidget()) {
-            auto *dock = qobject_cast<QDockWidget*>(parentWidget()->parentWidget());
+        QWidget *parent = this;
+        while (parent) {
+            auto *dock = qobject_cast<QDockWidget*>(parent);
             if (dock) {
                 dock->hide();
+                return;
             }
+            parent = parent->parentWidget();
         }
     });
     
@@ -117,10 +132,6 @@ void AgentPanel::setupUi()
             }
         }
     }
-    
-    QTimer *autoSaveTimer = new QTimer(this);
-    connect(autoSaveTimer, &QTimer::timeout, this, &AgentPanel::saveCurrentThread);
-    autoSaveTimer->start(30000);
 }
 
 void AgentPanel::connectSignals()
@@ -176,7 +187,14 @@ void AgentPanel::closeChatTab(int index)
         return;
     }
     
-    saveCurrentThread();
+    // Get the thread ID before removing the tab
+    QString threadId = m_tabs->tabToolTip(index);
+    
+    // Don't save, just delete the thread
+    if (!threadId.isEmpty() && m_threadStorage) {
+        bool deleted = m_threadStorage->deleteThread(threadId);
+        qDebug() << "AgentPanel: Deleting thread" << threadId << (deleted ? "success" : "failed");
+    }
     
     QWidget *widget = m_tabs->widget(index);
     m_tabs->removeTab(index);
@@ -200,6 +218,32 @@ void AgentPanel::updateTabTitle(int index, const QString &title)
     }
 }
 
+void AgentPanel::renameChatTab(int index)
+{
+    if (index < 0 || index >= m_tabs->count()) {
+        return;
+    }
+    
+    QString currentTitle = m_tabs->tabText(index);
+    bool ok = false;
+    QString newTitle = QInputDialog::getText(
+        this,
+        i18n("Rename Chat"),
+        i18n("Enter a new name for this chat:"),
+        QLineEdit::Normal,
+        currentTitle,
+        &ok
+    );
+    
+    if (ok && !newTitle.trimmed().isEmpty()) {
+        updateTabTitle(index, newTitle.trimmed());
+        
+        // Update the thread title in storage
+        m_hasUnsavedChanges = true;
+        saveCurrentThread();
+    }
+}
+
 void AgentPanel::saveCurrentThread()
 {
     int currentIndex = m_tabs->currentIndex();
@@ -216,7 +260,11 @@ void AgentPanel::saveCurrentThread()
         QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
         
         ConversationThread currentThread;
-        currentThread.id = m_currentThreadId;
+        if (threads.contains(m_currentThreadId)) {
+            currentThread = threads[m_currentThreadId];
+        } else {
+            currentThread.id = m_currentThreadId;
+        }
         currentThread.title = m_tabs->tabText(currentIndex);
         
         m_threadStorage->saveThread(currentThread);
@@ -227,13 +275,28 @@ void AgentPanel::saveCurrentThread()
 
 void AgentPanel::loadExistingThreads()
 {
-    QMap<QString, ConversationThread> threads = m_threadStorage->loadThreadsForProject(QString());
+    QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
+    
+    // Track max counter from existing threads
+    QRegularExpression counterPattern("chat_\\d+_(\\d+)");
+    for (auto it = threads.begin(); it != threads.end(); ++it) {
+        // Parse existing thread IDs to find the max counter
+        QString id = it.key();
+        QRegularExpressionMatch match = counterPattern.match(id);
+        if (match.hasCapture()) {
+            int counter = match.captured(1).toInt();
+            m_chatCounter = qMax(m_chatCounter, counter);
+        }
+    }
+    
+    qDebug() << "AgentPanel: Loaded threads" << threads.size() << "updated counter to" << m_chatCounter;
     
     if (threads.isEmpty()) {
         return;
     }
     
-    if (m_tabs->count() == 1) {
+    // Clear all existing tabs before loading saved threads
+    while (m_tabs->count() > 0) {
         QWidget *widget = m_tabs->widget(0);
         m_tabs->removeTab(0);
         delete widget;
@@ -242,8 +305,14 @@ void AgentPanel::loadExistingThreads()
     for (auto it = threads.begin(); it != threads.end(); ++it) {
         const ConversationThread &thread = it.value();
         
+        // Use thread title if available, otherwise generate a default title
+        QString title = thread.title;
+        if (title.trimmed().isEmpty()) {
+            title = generateChatTitle(m_chatCounter);
+        }
+        
         ThreadView *threadView = new ThreadView(m_tabs);
-        int index = m_tabs->addTab(threadView, thread.title);
+        int index = m_tabs->addTab(threadView, title);
         m_tabs->setTabToolTip(index, thread.id);
         
         threadView->loadMessages(thread.messages);
@@ -277,11 +346,13 @@ void AgentPanel::onTabCloseRequested(int index)
 void AgentPanel::onCurrentTabChanged(int index)
 {
     if (index >= 0 && index < m_tabs->count()) {
-        m_currentThreadId = m_tabs->tabToolTip(index);
-        
-        if (index > 0) {
+        // Save only if we're switching away from a tab with unsaved changes
+        if (m_hasUnsavedChanges) {
             saveCurrentThread();
+            m_hasUnsavedChanges = false;
         }
+        
+        m_currentThreadId = m_tabs->tabToolTip(index);
     }
 }
 
@@ -296,6 +367,28 @@ void AgentPanel::onSendMessage(const QString &message)
     if (!m_agent || message.trimmed().isEmpty() || m_currentThreadId.isEmpty()) {
         return;
     }
+    
+    // Ensure the thread has the current model selected in the dropdown
+    if (m_provider && m_threadStorage) {
+        QString currentModel = m_inputBar->currentModel();
+        if (!currentModel.isEmpty()) {
+            ConversationThread thread;
+            thread.id = m_currentThreadId;
+            if (m_threadStorage) {
+                QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
+                if (threads.contains(m_currentThreadId)) {
+                    thread = threads[m_currentThreadId];
+                }
+            }
+            if (thread.currentModel != currentModel) {
+                thread.currentModel = currentModel;
+                m_threadStorage->saveThread(thread);
+                qDebug() << "AgentPanel: Updated thread model to:" << currentModel;
+            }
+        }
+    }
+    
+    m_hasUnsavedChanges = true;
     
     int currentIndex = m_tabs->currentIndex();
     QString currentTitle = m_tabs->tabText(currentIndex);
@@ -327,6 +420,22 @@ void AgentPanel::onModelChanged(const QString &model)
 {
     m_config->setActiveModel(model);
     qDebug() << "AgentPanel: Model changed to:" << model;
+    
+    // Also update the current thread's model
+    if (!m_currentThreadId.isEmpty() && m_threadStorage) {
+        ConversationThread thread;
+        thread.id = m_currentThreadId;
+        if (m_threadStorage) {
+            QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
+            if (threads.contains(m_currentThreadId)) {
+                thread = threads[m_currentThreadId];
+            }
+        }
+        thread.currentModel = model;
+        // Save the updated thread (pass the whole object)
+        m_threadStorage->saveThread(thread);
+        qDebug() << "AgentPanel: Updated thread model to:" << model;
+    }
 }
 
 void AgentPanel::onSystemPromptChanged(const QString &prompt)
@@ -343,6 +452,7 @@ void AgentPanel::onResponseChunk(const QString &chunk)
         ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(currentIndex));
         if (threadView) {
             threadView->showStreamingChunk(chunk);
+            m_hasUnsavedChanges = true;
         }
     }
 }
@@ -389,6 +499,7 @@ void AgentPanel::onError(const QString &error)
         ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(currentIndex));
         if (threadView) {
             threadView->appendHtml(QString("<div class='tool-result error'>%1</div>").arg(i18n("Error: %1").arg(error)));
+            threadView->ensureCursorVisible();  // Scroll to show the error
         }
     }
 }

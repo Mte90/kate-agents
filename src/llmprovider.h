@@ -69,8 +69,7 @@ public:
         const std::vector<LLMMessage> &messages,
         const std::vector<ToolDefinition> &tools,
         const QString &model,
-        double temperature = 0.7,
-        int maxTokens = 4096
+        double temperature = 0.7
     ) = 0;
 
     virtual void chatStream(
@@ -80,8 +79,7 @@ public:
         std::function<void(const QString &chunk)> onChunk,
         std::function<void(const LLMResponse &final)> onDone,
         std::function<void(const QString &error)> onError,
-        double temperature = 0.7,
-        int maxTokens = 4096
+        double temperature = 0.7
     ) = 0;
 
 signals:

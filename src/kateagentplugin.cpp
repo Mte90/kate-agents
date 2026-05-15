@@ -59,8 +59,8 @@ public:
         qDebug() << "AgentGuiClient: Creating toggle action...";
         auto toggleAction = ac->addAction("kateagent-toggle");
         toggleAction->setText(i18n("Toggle Kate Agent Panel"));
-        toggleAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_A));
         toggleAction->setIcon(QIcon::fromTheme("dialog-information"));
+        ac->setDefaultShortcut(toggleAction, QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_A));
         qDebug() << "AgentGuiClient: Toggle action created";
         
         connect(toggleAction, &QAction::triggered, this, [this]() {
@@ -184,7 +184,11 @@ QObject *KateAgentPlugin::createView(KTextEditor::MainWindow *mw)
 
 KTextEditor::ConfigPage *KateAgentPlugin::configPage(int number, QWidget *parent)
 {
-    Q_UNUSED(number)
+    // Kate calls configPage() with different numbers to discover config pages
+    // Return nullptr for number != 0, only create page for number == 0
+    if (number != 0) {
+        return nullptr;
+    }
     Q_UNUSED(parent)
     return new AgentConfigPage(parent, this);
 }

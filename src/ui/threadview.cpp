@@ -1,5 +1,6 @@
 #include "threadview.h"
 #include "llmprovider.h"
+#include <KLocalizedString>
 #include <QTextDocument>
 #include <QTextCursor>
 #include <QTextBlock>
@@ -20,6 +21,27 @@ ThreadView::ThreadView(QWidget *parent)
     connect(m_cursorTimer, &QTimer::timeout, this, &ThreadView::toggleCursor);
     
     document()->setDefaultStyleSheet("");
+    
+    // Set up palette-aware stylesheet for chat messages
+    QPalette pal = palette();
+    QString sheet;
+    sheet += "QTextBrowser { background-color: " + pal.color(QPalette::Base).name() + "; color: " + pal.color(QPalette::Text).name() + "; }\n";
+    sheet += ".user-message { background-color: " + pal.color(QPalette::AlternateBase).lighter(110).name() + "; border-left: 3px solid " + pal.color(QPalette::Highlight).name() + "; border-radius: 6px; padding: 10px 12px; margin: 8px 0; }\n";
+    sheet += ".assistant-message { background-color: " + pal.color(QPalette::Base).lighter(105).name() + "; border-left: 3px solid " + pal.color(QPalette::Mid).name() + "; border-radius: 6px; padding: 10px 12px; margin: 8px 0; }\n";
+    sheet += ".tool-call { background-color: " + pal.color(QPalette::Base).name() + "; border: 1px solid " + pal.color(QPalette::Midlight).name() + "; border-radius: 4px; padding: 6px 8px; margin: 6px 0; font-family: monospace; font-size: 0.9em; }\n";
+    sheet += ".tool-result { background-color: " + pal.color(QPalette::Base).name() + "; border: 1px solid " + pal.color(QPalette::Mid).name() + "; border-radius: 4px; padding: 6px 8px; margin: 6px 0; font-family: monospace; font-size: 0.9em; }\n";
+    sheet += ".tool-result.error { background-color: " + pal.color(QPalette::Base).lighter(108).name() + "; border: 1px solid " + pal.color(QPalette::Text).name() + "; }\n";
+    sheet += ".terminal-output { background-color: " + pal.color(QPalette::Base).name() + "; border: 1px solid " + pal.color(QPalette::Midlight).name() + "; border-radius: 4px; margin: 6px 0; overflow: hidden; }\n";
+    sheet += ".terminal-header { background-color: " + pal.color(QPalette::Mid).name() + "; padding: 6px 8px; font-family: monospace; font-size: 0.9em; border-bottom: 1px solid " + pal.color(QPalette::Midlight).name() + "; }\n";
+    sheet += ".terminal-body { padding: 8px; font-family: monospace; font-size: 0.85em; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }\n";
+    sheet += "code { background-color: " + pal.color(QPalette::Base).lighter(105).name() + "; padding: 2px 4px; border-radius: 3px; font-family: monospace; font-size: 0.9em; }\n";
+    sheet += "pre { background-color: " + pal.color(QPalette::Base).lighter(108).name() + "; padding: 8px; border-radius: 4px; overflow-x: auto; }\n";
+    sheet += "pre code { background-color: transparent; padding: 0; }\n";
+    sheet += "a { color: " + pal.color(QPalette::Highlight).name() + "; text-decoration: underline; }\n";
+    sheet += "hr { border: none; border-top: 1px solid " + pal.color(QPalette::Midlight).name() + "; margin: 12px 0; }\n";
+    sheet += ".cursor { animation: blink 1s step-end infinite; }\n";
+    sheet += "@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }\n";
+    setStyleSheet(sheet);
 }
 
 ThreadView::~ThreadView() = default;
@@ -70,21 +92,21 @@ void ThreadView::appendHtml(const QString &html)
 
 void ThreadView::appendUserMessage(const QString &message)
 {
-    appendHtml(QString("<div class='user-message'><strong>👤 User:</strong><br>%1</div>")
-               .arg(parseMarkdown(message)));
+    appendHtml(QString("<div class='user-message'><strong>%1</strong><br>%2</div>")
+               .arg(i18n("User:"), parseMarkdown(message)));
 }
 
 void ThreadView::appendAssistantMessage(const QString &message)
 {
-    appendHtml(QString("<div class='assistant-message'><strong>🤖 Assistant:</strong><br>%1</div>")
-               .arg(parseMarkdown(message)));
+    appendHtml(QString("<div class='assistant-message'><strong>%1</strong><br>%2</div>")
+               .arg(i18n("Assistant:"), parseMarkdown(message)));
 }
 
 void ThreadView::appendToolCall(const QString &toolName, const QJsonObject &args)
 {
     QString argsStr = QJsonDocument(args).toJson(QJsonDocument::Compact);
-    appendHtml(QString("<div class='tool-call'>🔧 <strong>%1</strong><br>%2</div>")
-               .arg(toolName)
+    appendHtml(QString("<div class='tool-call'><strong>%1</strong><br>%2</div>")
+               .arg(i18n("Tool:"), toolName)
                .arg(escapeHtml(argsStr)));
 }
 
@@ -105,19 +127,18 @@ void ThreadView::appendToolResult(const QString &toolName, const QJsonObject &re
             output = lines.mid(0, 100).join('\n') + "\n... (output truncated, 100 lines max)";
         }
         
-        QString exitCodeInfo = exitCode != 0 ? QString(" (exit code: %1)").arg(exitCode) : "";
+        QString exitCodeInfo = exitCode != 0 ? QString(" (%1: %2)").arg(i18n("exit code"), QString::number(exitCode)) : "";
         if (timedOut) {
-            exitCodeInfo += " [TIMED OUT]";
+            exitCodeInfo += QString(" [%1]").arg(i18n("TIMED OUT"));
         }
         
         QString html = QString(R"(
             <div class='terminal-output'>
-                <div class='terminal-header'>▶ %1%2</div>
-                <div class='terminal-body'>%3</div>
+                <div class='terminal-header'>%1 %2%3</div>
+                <div class='terminal-body'>%4</div>
             </div>
         )")
-        .arg(escapeHtml(command))
-        .arg(exitCodeInfo)
+        .arg(i18n("Command:"), escapeHtml(command), exitCodeInfo)
         .arg(escapeHtml(output));
         
         appendHtml(html);
@@ -131,9 +152,11 @@ void ThreadView::appendToolResult(const QString &toolName, const QJsonObject &re
         resultStr = resultStr.left(500) + "...";
     }
     
-    appendHtml(QString("<div class='tool-result %1'>✅ %2<br>%3</div>")
+    QString statusIcon = success ? i18n("Success:") : i18n("Failed:");
+    appendHtml(QString("<div class='tool-result %1'><strong>%2</strong> %3<br>%4</div>")
                .arg(success ? "" : "error")
                .arg(toolName)
+               .arg(statusIcon)
                .arg(escapeHtml(resultStr)));
 }
 

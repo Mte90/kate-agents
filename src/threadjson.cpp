@@ -143,8 +143,11 @@ QString ThreadJsonStorage::saveThread(const QString &threadId, const QList<LLMMe
     QString projectId = getCurrentProjectId();
     QString prefix = getProjectPrefix(projectId);
     
-    // Prepend project prefix to thread ID
-    QString fullThreadId = prefix + threadId;
+    // Don't prepend prefix if threadId already starts with it
+    QString fullThreadId = threadId;
+    if (!prefix.isEmpty() && !threadId.startsWith(prefix)) {
+        fullThreadId = prefix + threadId;
+    }
     QString path = getThreadDir() + "/" + fullThreadId + ".json";
     
     QJsonObject root = messagesToJson(messages);
