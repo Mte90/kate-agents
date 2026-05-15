@@ -1,6 +1,7 @@
 #ifndef KATEAGENTPLUGIN_H
 #define KATEAGENTPLUGIN_H
 #include <KTextEditor/Plugin>
+#include <KTextEditor/SessionConfigInterface>
 #include <KTextEditor/MainWindow>
 #include <QObject>
 #include <QAction>

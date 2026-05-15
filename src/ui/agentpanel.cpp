@@ -283,7 +283,7 @@ void AgentPanel::loadExistingThreads()
         // Parse existing thread IDs to find the max counter
         QString id = it.key();
         QRegularExpressionMatch match = counterPattern.match(id);
-        if (match.hasCapture()) {
+        if (match.hasCaptured(0)) {
             int counter = match.captured(1).toInt();
             m_chatCounter = qMax(m_chatCounter, counter);
         }

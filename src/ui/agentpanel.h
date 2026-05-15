@@ -116,16 +116,15 @@ private:
     void loadExistingThreads();
     QString generateChatTitle(int chatNumber);
     
-    // Member variables (order matters - must match constructor initialization list)
+    // Member variables (order must match constructor initialization list)
     AgentLoop *m_agent;
     ToolRegistry *m_registry;
     LLMProvider *m_provider;
     ConfigManager *m_config;
     PermissionManager *m_permissions;
-    ThreadStorage *m_threadStorage;
-    
     CloseableTabWidget *m_tabs = nullptr;
     InputBar *m_inputBar;
+    ThreadStorage *m_threadStorage;
     int m_chatCounter;
     QString m_currentThreadId;
     bool m_hasUnsavedChanges = false;  // Track if current thread has unsaved changes

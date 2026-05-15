@@ -138,9 +138,10 @@ QFuture<LLMResponse> OpenAIProvider::chat(
         
         if (reply->error() == QNetworkReply::NoError) {
             qDebug() << "[OpenAIProvider] HTTP 200 OK";
-            QByteArray responseData = reply->readAll();
-            qDebug() << "[OpenAIProvider] Response body:" << responseData.left(300) << (responseData.length() > 300 ? "... (truncated)" : "");
-            
+QByteArray responseData = reply->readAll();
+qDebug() << "[OpenAIProvider] RAW RESPONSE (first 500 chars):" << responseData.left(500);
+qDebug() << "[OpenAIProvider] Content-Type:" << reply->header(QNetworkRequest::ContentTypeHeader).toString();
+qDebug() << "[OpenAIProvider] Parsing JSON...";            
             LLMResponse response;
             QJsonDocument doc = QJsonDocument::fromJson(responseData);
             QJsonObject root = doc.object();
