@@ -92,12 +92,14 @@ void ThreadView::appendHtml(const QString &html)
 
 void ThreadView::appendUserMessage(const QString &message)
 {
+    appendHtml("<hr>");
     appendHtml(QString("<div class='user-message'><strong>%1</strong><br>%2</div>")
                .arg(i18n("User:"), parseMarkdown(message)));
 }
 
 void ThreadView::appendAssistantMessage(const QString &message)
 {
+    appendHtml("<hr>");
     appendHtml(QString("<div class='assistant-message'><strong>%1</strong><br>%2</div>")
                .arg(i18n("Assistant:"), parseMarkdown(message)));
 }
@@ -178,6 +180,23 @@ void ThreadView::showStreamingChunk(const QString &chunk)
     ensureCursorVisible();
 }
 
+void ThreadView::endStreaming()
+{
+    m_cursorTimer->stop();
+    
+    QTextCursor cursor = textCursor();
+    cursor.movePosition(QTextCursor::End, QTextCursor::MoveAnchor);
+    if (cursor.position() > 0) {
+        cursor.movePosition(QTextCursor::PreviousCharacter, QTextCursor::KeepSelection, 13);
+        cursor.removeSelectedText();
+    }
+    
+    cursor.movePosition(QTextCursor::End);
+    insertHtml("<br>");
+    
+    m_streamingContent.clear();
+}
+
 void ThreadView::clear()
 {
     QTextBrowser::clear();
@@ -212,4 +231,9 @@ void ThreadView::loadMessages(const QList<LLMMessage> &messages)
     QTextCursor cursor = textCursor();
     cursor.movePosition(QTextCursor::End);
     setTextCursor(cursor);
+}
+
+void ThreadView::renderThread(const QList<LLMMessage> &messages)
+{
+    loadMessages(messages);
 }

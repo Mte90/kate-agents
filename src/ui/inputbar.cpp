@@ -141,9 +141,14 @@ void InputBar::showAutocompletePopup(int atIndex)
     m_filePopup->m_model->setStringList(filtered);
     
     if (!filtered.isEmpty()) {
-        QTextCursor cursor = m_inputEdit->textCursor();
-        QRect cursorRect = m_inputEdit->cursorRect(cursor);
-        QPoint globalPos = m_inputEdit->mapToGlobal(cursorRect.bottomLeft());
+        // Position popup below the input edit, aligned to the left
+        int inputHeight = m_inputEdit->height();
+        int inputY = m_inputEdit->mapToGlobal(QPoint(0, inputHeight)).y();
+        int inputX = m_inputEdit->mapToGlobal(QPoint(0, 0)).x();
+        
+        // Adjust for font height to position just below
+        int yPos = inputY + m_inputEdit->fontMetrics().lineSpacing();
+        QPoint globalPos(inputX, yPos);
         
         m_filePopup->showAt(globalPos);
     } else {
@@ -187,11 +192,11 @@ void InputBar::insertFilePath(const QString &filePath)
         }
         
         after = after.mid(endPos);
-        QString newText = before + filePath + " " + after;
+        QString newText = before + "@" + filePath + " " + after;
         
         m_inputEdit->setPlainText(newText);
         QTextCursor cursor = m_inputEdit->textCursor();
-        cursor.setPosition(atIndex + filePath.length() + 1);
+        cursor.setPosition(atIndex + 1 + filePath.length() + 1);
         m_inputEdit->setTextCursor(cursor);
         m_filePopup->hidePopup();
     }

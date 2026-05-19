@@ -4,10 +4,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QStandardPaths>
 #include <QDebug>
 #include <QProcess>
-#include <QCryptographicHash>
 
 // Static member initialization
 QString ThreadJsonStorage::s_currentProjectId;
@@ -24,7 +24,6 @@ QString ThreadJsonStorage::getProjectPrefix(const QString &projectId)
     if (projectId.isEmpty()) {
         return QString();
     }
-    // Sanitize project ID for use in filename (replace spaces and special chars)
     QString sanitized = projectId;
     sanitized.replace(" ", "_");
     sanitized.replace("/", "_");
@@ -32,7 +31,7 @@ QString ThreadJsonStorage::getProjectPrefix(const QString &projectId)
     sanitized.replace(":", "_");
     sanitized.replace("*", "_");
     sanitized.replace("?", "_");
-    sanitized.replace("\"", "_");
+    sanitized.replace('"', "_");
     sanitized.replace("<", "_");
     sanitized.replace(">", "_");
     sanitized.replace("|", "_");
@@ -46,232 +45,278 @@ QString ThreadJsonStorage::getCurrentProjectId()
     }
 
     QString gitDir = detectGitRepoRoot();
-    if (!gitDir.isEmpty()) {
+    if (gitDir.isEmpty()) {
+        s_currentProjectId = "default";
+    } else {
         s_currentProjectId = getRepoName(gitDir);
-        qDebug() << "ThreadJsonStorage: Detected git project:" << s_currentProjectId;
-        return s_currentProjectId;
     }
-
-    QFileInfo info(QDir::currentPath());
-    s_currentProjectId = info.fileName();
-    qDebug() << "ThreadJsonStorage: Using current directory as project ID:" << s_currentProjectId;
     return s_currentProjectId;
 }
 
-QString ThreadJsonStorage::detectGitRepoRoot()
+QString ThreadJsonStorage::getThreadFilePath(const QString &projectId)
 {
-    // Try to find git repo using git rev-parse --show-toplevel
-    QProcess process;
-    process.setProcessChannelMode(QProcess::MergedChannels);
-    process.start("git", QStringList() << "rev-parse" << "--show-toplevel");
-    
-    if (process.waitForFinished(3000)) {
-        QString output = QString::fromUtf8(process.readAll()).trimmed();
-        if (process.exitCode() == 0 && !output.isEmpty()) {
-            return output;
-        }
-    }
-    
-    return QString();
-}
-
-QString ThreadJsonStorage::getRepoName(const QString &repoPath)
-{
-    // Get the basename of the repo path (e.g., /path/to/my-repo -> my-repo)
-    QFileInfo info(repoPath);
-    return info.fileName();
-}
-
-void ThreadJsonStorage::setCurrentProjectId(const QString &projectId)
-{
-    s_currentProjectId = projectId;
-    qDebug() << "ThreadJsonStorage: Set project ID to:" << s_currentProjectId;
-}
-
-QString ThreadJsonStorage::getThreadPath(const QString &threadId)
-{
-    QString projectId = getCurrentProjectId();
     QString prefix = getProjectPrefix(projectId);
-    
-    // If threadId already has a project prefix, use it as-is
-    if (!prefix.isEmpty() && threadId.startsWith(prefix)) {
-        return getThreadDir() + "/" + threadId + ".json";
-    }
-    
-    // Otherwise, prepend the project prefix
-    return getThreadDir() + "/" + prefix + threadId + ".json";
+    return getThreadDir() + "/" + prefix + "threads.json";
 }
 
-QJsonObject ThreadJsonStorage::messagesToJson(const QList<LLMMessage> &messages)
+static QJsonObject loadThreadsFile(const QString &projectId)
 {
-    QJsonObject root;
-    QJsonArray msgArray;
-
-    for (const auto &msg : messages) {
-        QJsonObject msgObj;
-        msgObj["role"] = msg.role;
-        msgObj["content"] = msg.content;
-        msgArray.append(msgObj);
-    }
-
-    root["messages"] = msgArray;
-    return root;
-}
-
-QList<LLMMessage> ThreadJsonStorage::jsonToMessages(const QJsonObject &json)
-{
-    QList<LLMMessage> messages;
-
-    if (!json.contains("messages") || !json["messages"].isArray()) {
-        return messages;
-    }
-
-    QJsonArray msgArray = json["messages"].toArray();
-    for (const auto &value : msgArray) {
-        QJsonObject msgObj = value.toObject();
-        LLMMessage msg;
-        msg.role = msgObj["role"].toString();
-        msg.content = msgObj["content"].toString();
-        messages.append(msg);
-    }
-
-    return messages;
-}
-
-QString ThreadJsonStorage::saveThread(const QString &threadId, const QList<LLMMessage> &messages, const QString &title)
-{
-    QString projectId = getCurrentProjectId();
-    QString prefix = getProjectPrefix(projectId);
+    QString filePath = ThreadJsonStorage::getThreadFilePath(projectId);
+    QFile file(filePath);
     
-    // Don't prepend prefix if threadId already starts with it
-    QString fullThreadId = threadId;
-    if (!prefix.isEmpty() && !threadId.startsWith(prefix)) {
-        fullThreadId = prefix + threadId;
-    }
-    QString path = getThreadDir() + "/" + fullThreadId + ".json";
-    
-    QJsonObject root = messagesToJson(messages);
-    root["title"] = title;
-    root["projectId"] = projectId;  // Store project ID in JSON for metadata
-    
-    QJsonDocument doc(root);
-    QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        qWarning() << "Cannot write thread:" << path;
-        return QString();
+    if (!file.exists()) {
+        return QJsonObject();
     }
     
-    file.write(doc.toJson(QJsonDocument::Indented));
-    file.close();
-    
-    return path;
-}
-
-QList<LLMMessage> ThreadJsonStorage::loadThread(const QString &threadId)
-{
-    // Try with current project prefix first
-    QString projectId = getCurrentProjectId();
-    QString prefix = getProjectPrefix(projectId);
-    QString fullThreadId = prefix + threadId;
-    QString path = getThreadDir() + "/" + fullThreadId + ".json";
-    
-    QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        // Try without prefix (backward compatibility for old files)
-        if (!prefix.isEmpty() && threadId.startsWith(prefix)) {
-            path = getThreadDir() + "/" + threadId + ".json";
-            file.setFileName(path);
-        }
-        
-        if (!file.open(QIODevice::ReadOnly)) {
-            return QList<LLMMessage>();
-        }
+        qWarning() << "Failed to open threads file for reading:" << filePath;
+        return QJsonObject();
     }
-
+    
     QByteArray data = file.readAll();
     file.close();
-
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (!doc.isObject()) {
-        return QList<LLMMessage>();
+    
+    if (data.isEmpty()) {
+        return QJsonObject();
     }
+    
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (doc.isNull() || !doc.isObject()) {
+        return QJsonObject();
+    }
+    
+    return doc.object();
+}
 
-    return jsonToMessages(doc.object());
+static bool saveThreadsFile(const QString &projectId, const QJsonObject &data)
+{
+    QString filePath = ThreadJsonStorage::getThreadFilePath(projectId);
+    QFile file(filePath);
+    
+    if (!file.open(QIODevice::WriteOnly)) {
+        qWarning() << "ThreadJsonStorage::saveThreadsFile - Failed to open threads file for writing:" << filePath;
+        return false;
+    }
+    
+    QJsonDocument doc(data);
+    QByteArray jsonBytes = doc.toJson(QJsonDocument::Indented);
+    qDebug() << "ThreadJsonStorage::saveThreadsFile - Writing to:" << filePath;
+    qDebug() << "ThreadJsonStorage::saveThreadsFile - JSON content:" << jsonBytes.left(500);
+    
+    qint64 written = file.write(jsonBytes);
+    file.close();
+    
+    qDebug() << "ThreadJsonStorage::saveThreadsFile - Bytes written:" << written;
+    
+    // Verify the file was actually written
+    QFile verifyFile(filePath);
+    if (verifyFile.open(QIODevice::ReadOnly)) {
+        QByteArray verifyData = verifyFile.readAll();
+        verifyFile.close();
+        qDebug() << "ThreadJsonStorage::saveThreadsFile - Verification: File now contains" << verifyData.size() << "bytes";
+    }
+    
+    return true;
 }
 
 QStringList ThreadJsonStorage::listThreads()
 {
-    // List all threads (backward compatibility - includes all projects)
-    QStringList threads;
-    QString dirPath = getThreadDir();
-
-    QDir dir(dirPath);
-    QFileInfoList entries = dir.entryInfoList(QStringList() << "*.json", QDir::Files, QDir::Name);
-
-    for (const QFileInfo &entry : entries) {
-        QString threadId = entry.completeBaseName();
-        if (threadId != "config") {
-            threads.append(threadId);
-        }
-    }
-
-    return threads;
+    return listThreadsForProject(getCurrentProjectId());
 }
 
 QStringList ThreadJsonStorage::listThreadsForProject(const QString &projectId)
 {
     QStringList threads;
-    QString dirPath = getThreadDir();
+    QJsonObject root = loadThreadsFile(projectId);
+    
+    // Get threads object
     QString prefix = getProjectPrefix(projectId);
-
-    QDir dir(dirPath);
-    QFileInfoList entries = dir.entryInfoList(QStringList() << "*.json", QDir::Files, QDir::Name);
-
-    for (const QFileInfo &entry : entries) {
-        QString threadId = entry.completeBaseName();
-        
-        // Skip non-project files
-        if (threadId == "config") {
-            continue;
-        }
-        
-        // If project ID provided, match by prefix
-        if (!prefix.isEmpty()) {
-            if (threadId.startsWith(prefix)) {
-                // Remove prefix from thread ID
-                QString threadIdWithoutPrefix = threadId.mid(prefix.length());
-                threads.append(threadIdWithoutPrefix);
-            }
-        } else {
-            // No project ID - include files without any project prefix
-            // (backward compatibility for old global chats)
-            if (!threadId.contains("_chat_")) {
-                // This might be an old-style global chat, include it
-                threads.append(threadId);
-            }
-        }
+    QString threadsKey = prefix + "threads";
+    
+    if (root.contains(threadsKey) && root[threadsKey].isObject()) {
+        QJsonObject threadsObj = root[threadsKey].toObject();
+        threads = threadsObj.keys();
     }
-
+    
     return threads;
+}
+
+QList<LLMMessage> ThreadJsonStorage::loadThread(const QString &threadId)
+{
+    QList<LLMMessage> messages;
+    QString projectId = getCurrentProjectId();
+    QJsonObject root = loadThreadsFile(projectId);
+    
+    QString prefix = getProjectPrefix(projectId);
+    QString threadsKey = prefix + "threads";
+    
+    if (!root.contains(threadsKey) || !root[threadsKey].isObject()) {
+        return messages;
+    }
+    
+    QJsonObject threadsObj = root[threadsKey].toObject();
+    if (!threadsObj.contains(threadId) || !threadsObj[threadId].isObject()) {
+        return messages;
+    }
+    
+    QJsonArray messagesArray = threadsObj[threadId].toArray();
+    
+    for (const QJsonValue &msgValue : messagesArray) {
+        if (!msgValue.isObject()) continue;
+        
+        QJsonObject msgObj = msgValue.toObject();
+        LLMMessage msg;
+        
+        msg.role = msgObj["role"].toString();
+        msg.content = msgObj["content"].toString();
+        msg.toolCallId = msgObj["toolCallId"].toString();
+        
+        messages.append(msg);
+    }
+    
+    return messages;
+}
+
+bool ThreadJsonStorage::saveThread(const QString &threadId, const QList<LLMMessage> &messages, const QString &currentModel)
+{
+    QString projectId = getCurrentProjectId();
+    QJsonObject root = loadThreadsFile(projectId);
+    
+    QString prefix = getProjectPrefix(projectId);
+    QString threadsKey = prefix + "threads";
+    
+    if (!root.contains(threadsKey) || !root[threadsKey].isObject()) {
+        root[threadsKey] = QJsonObject();
+    }
+    
+    QJsonObject threadsObj = root[threadsKey].toObject();
+    QJsonArray messagesArray;
+    
+    for (const LLMMessage &msg : messages) {
+        QJsonObject msgObj;
+        msgObj["role"] = msg.role;
+        msgObj["content"] = msg.content;
+        msgObj["toolCallId"] = msg.toolCallId;
+        
+        // Note: toolCalls not serialized (LLMMessage doesn't have this field)
+        
+        messagesArray.append(msgObj);
+    }
+    
+    // Save currentModel if provided
+    QJsonObject threadObj;
+    threadObj["messages"] = messagesArray;
+    if (!currentModel.isEmpty()) {
+        threadObj["currentModel"] = currentModel;
+    }
+    
+    threadsObj[threadId] = threadObj;
+    root[threadsKey] = threadsObj;
+    
+    return saveThreadsFile(projectId, root);
 }
 
 bool ThreadJsonStorage::deleteThread(const QString &threadId)
 {
-    // Try with current project prefix
     QString projectId = getCurrentProjectId();
+    qDebug() << "ThreadJsonStorage::deleteThread - threadId:" << threadId << "projectId:" << projectId;
+    
+    QJsonObject root = loadThreadsFile(projectId);
+    
     QString prefix = getProjectPrefix(projectId);
-    QString fullThreadId = prefix + threadId;
-    QString path = getThreadDir() + "/" + fullThreadId + ".json";
+    QString threadsKey = prefix + "threads";
     
-    if (QFile::remove(path)) {
-        return true;
+    qDebug() << "ThreadJsonStorage::deleteThread - threadsKey:" << threadsKey << "root contains key:" << root.contains(threadsKey);
+    
+    if (!root.contains(threadsKey) || !root[threadsKey].isObject()) {
+        qWarning() << "ThreadJsonStorage::deleteThread - threads key not found or not an object";
+        return false;
     }
     
-    // Try without prefix (backward compatibility)
-    if (!prefix.isEmpty() && threadId.startsWith(prefix)) {
-        path = getThreadDir() + "/" + threadId + ".json";
-        return QFile::remove(path);
+    QJsonObject threadsObj = root[threadsKey].toObject();
+    qDebug() << "ThreadJsonStorage::deleteThread - threadsObj keys:" << threadsObj.keys();
+    
+    if (!threadsObj.contains(threadId)) {
+        qWarning() << "ThreadJsonStorage::deleteThread - threadId not found in storage";
+        return false;
     }
     
-    return false;
+    threadsObj.remove(threadId);
+    root[threadsKey] = threadsObj;
+    
+    qDebug() << "ThreadJsonStorage::deleteThread - saving, new keys:" << root[threadsKey].toObject().keys();
+    
+    bool saved = saveThreadsFile(projectId, root);
+    qDebug() << "ThreadJsonStorage::deleteThread - save result:" << saved;
+    
+    return saved;
+}
+
+QString ThreadJsonStorage::detectGitRepoRoot()
+{
+    return detectGitRepoRootFromDir(QDir::currentPath());
+}
+
+QString ThreadJsonStorage::detectGitRepoRootFromDir(const QString &startDir)
+{
+    if (startDir.isEmpty()) {
+        return QString();
+    }
+    
+    QProcess process;
+    process.setWorkingDirectory(startDir);
+    process.start("git", QStringList() << "rev-parse" << "--show-toplevel");
+    process.waitForFinished(1000);
+    
+    if (process.exitCode() == 0) {
+        return QString(process.readAllStandardOutput()).trimmed();
+    }
+    
+    return QString();
+}
+
+QString ThreadJsonStorage::getProjectIdFromFile(const QString &filePath)
+{
+    if (filePath.isEmpty()) {
+        return "default";
+    }
+    
+    QFileInfo fi(filePath);
+    QString dir = fi.absoluteDir().absolutePath();
+    
+    // Search up the directory tree for a git repo
+    while (!dir.isEmpty()) {
+        QString gitDir = dir + "/.git";
+        if (QDir(gitDir).exists() || QFile(gitDir).exists()) {
+            // Found git repo, get its name
+            QFileInfo dirInfo(dir);
+            return dirInfo.fileName();
+        }
+        
+        // Move to parent directory
+        QString parentDir = QDir(dir).absolutePath();
+        if (parentDir == dir) {
+            // Reached root, no git repo found
+            break;
+        }
+        dir = parentDir;
+    }
+    
+    return "default";
+}
+
+QString ThreadJsonStorage::getRepoName(const QString &gitDir)
+{
+    QFileInfo fi(gitDir);
+    return fi.fileName();
+}
+
+void ThreadJsonStorage::setCurrentProjectId(const QString &projectId)
+{
+    s_currentProjectId = projectId;
+}
+
+void ThreadJsonStorage::setCurrentProjectIdFromFile(const QString &filePath)
+{
+    s_currentProjectId = getProjectIdFromFile(filePath);
 }

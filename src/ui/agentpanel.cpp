@@ -18,7 +18,6 @@
 #include <QDir>
 #include <QJsonDocument>
 #include <QDate>
-#include <QDockWidget>
 #include <QRegularExpression>
 
 AgentPanel::AgentPanel(AgentLoop *agent, ToolRegistry *registry,
@@ -86,27 +85,8 @@ void AgentPanel::setupUi()
     newChatBtn->setToolTip(i18n("New Chat"));
     newChatBtn->setStyleSheet("QPushButton { font-weight: bold; font-size: 16px; }");
     connect(newChatBtn, &QPushButton::clicked, this, &AgentPanel::onNewChat);
-    
-    // Hide sidebar button
-    QPushButton *hideBtn = new QPushButton();
-    hideBtn->setFixedSize(16, 16);
-    hideBtn->setToolTip(i18n("Hide sidebar"));
-    hideBtn->setStyleSheet("QPushButton { font-size: 10px; border: none; } QPushButton:hover { background-color: palette(highlight); color: palette(highlighted-text); border-radius: 2px; }");
-    hideBtn->setText(QStringLiteral("\u2192"));  // Right arrow to indicate collapse
-    connect(hideBtn, &QPushButton::clicked, this, [this]() {
-        QWidget *parent = this;
-        while (parent) {
-            auto *dock = qobject_cast<QDockWidget*>(parent);
-            if (dock) {
-                dock->hide();
-                return;
-            }
-            parent = parent->parentWidget();
-        }
-    });
-    
-    newChatLayout->addWidget(hideBtn);
     newChatLayout->addStretch();
+    
     newChatLayout->addWidget(newChatBtn);
     
     mainLayout->addWidget(newChatWidget);
@@ -155,6 +135,7 @@ void AgentPanel::connectSignals()
         connect(m_agent, &AgentLoop::turnCompleted, this, &AgentPanel::onTurnCompleted);
         connect(m_agent, &AgentLoop::error, this, &AgentPanel::onError);
         connect(m_agent, &AgentLoop::runningChanged, this, &AgentPanel::onRunningChanged);
+    connect(m_agent, &AgentLoop::threadUpdated, this, &AgentPanel::onThreadUpdated);
     } else {
         qWarning() << "AgentPanel: m_agent is NULL - cannot connect AgentLoop signals";
     }
@@ -162,6 +143,26 @@ void AgentPanel::connectSignals()
     if (m_permissions) {
         connect(m_permissions, &PermissionManager::permissionRequested, 
                 this, &AgentPanel::onPermissionRequested);
+    }
+    
+    // Listen for settings changes from config page
+    // This ensures the sidebar updates when model is changed in settings
+    // Note: We need to connect to plugin's settingsChanged signal
+    // This will be set up in the plugin itself
+}
+
+// Method to update model from settings
+void AgentPanel::updateModelFromSettings()
+{
+    QString newModel = m_config->getActiveModel();
+    qDebug() << "AgentPanel: Updating model from settings:" << newModel;
+    
+    // Update the input bar model combo
+    if (m_inputBar) {
+        int idx = m_inputBar->findModel(newModel);
+        if (idx >= 0) {
+            m_inputBar->setCurrentModelIndex(idx);
+        }
     }
 }
 
@@ -253,6 +254,12 @@ void AgentPanel::saveCurrentThread()
     
     ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(currentIndex));
     if (!threadView || m_currentThreadId.isEmpty()) {
+        return;
+    }
+    
+    // Don't save if thread has no messages (empty chat)
+    if (threadView->document()->isEmpty()) {
+        qDebug() << "AgentPanel: Skipping save - empty thread" << m_currentThreadId;
         return;
     }
     
@@ -402,7 +409,9 @@ void AgentPanel::onSendMessage(const QString &message)
     }
     
     m_agent->addUserMessage(m_currentThreadId, message);
-    m_agent->executeTurn(m_currentThreadId);
+    m_activeThreadId = m_currentThreadId;  // Set active thread for response streaming
+    QString currentModel = m_inputBar->currentModel();
+    m_agent->executeTurn(m_currentThreadId, currentModel);  // Pass model explicitly
     
     m_inputBar->clear();
     
@@ -447,12 +456,25 @@ void AgentPanel::onSystemPromptChanged(const QString &prompt)
 
 void AgentPanel::onResponseChunk(const QString &chunk)
 {
-    int currentIndex = m_tabs->currentIndex();
-    if (currentIndex >= 0) {
-        ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(currentIndex));
-        if (threadView) {
-            threadView->showStreamingChunk(chunk);
-            m_hasUnsavedChanges = true;
+    // Find the tab for the active thread (not just currentIndex)
+    if (m_activeThreadId.isEmpty()) {
+        qDebug() << "AgentPanel: onResponseChunk - m_activeThreadId is EMPTY!";
+        return;
+    }
+    
+    qDebug() << "AgentPanel: onResponseChunk - Looking for thread:" << m_activeThreadId << "chunk length:" << chunk.length();
+    
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        QString tabThreadId = m_tabs->tabToolTip(i);
+        qDebug() << "AgentPanel: onResponseChunk - Checking tab" << i << "with threadId:" << tabThreadId;
+        if (tabThreadId == m_activeThreadId) {
+            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
+            if (threadView) {
+                qDebug() << "AgentPanel: onResponseChunk - Found matching tab, showing chunk";
+                threadView->showStreamingChunk(chunk);
+                m_hasUnsavedChanges = true;
+            }
+            break;
         }
     }
 }
@@ -485,7 +507,7 @@ void AgentPanel::onTurnCompleted()
     if (currentIndex >= 0) {
         ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(currentIndex));
         if (threadView) {
-            threadView->appendHtml("<hr>");
+            threadView->endStreaming();
         }
     }
     
@@ -528,6 +550,33 @@ void AgentPanel::reloadModels()
             if (!defaultModel.isEmpty() && models.contains(defaultModel)) {
                 m_inputBar->setCurrentModel(defaultModel);
             }
+        }
+    }
+}
+
+
+void AgentPanel::onThreadUpdated(const QString &threadId)
+{
+    // Load the thread from storage and render it
+    if (!m_threadStorage || threadId.isEmpty()) {
+        return;
+    }
+    
+    QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
+    if (!threads.contains(threadId)) {
+        return;
+    }
+    
+    ConversationThread thread = threads[threadId];
+    
+    // Find the tab for this thread
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        if (m_tabs->tabToolTip(i) == threadId) {
+            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
+            if (threadView) {
+                threadView->renderThread(thread.messages);
+            }
+            break;
         }
     }
 }

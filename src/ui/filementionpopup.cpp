@@ -68,10 +68,14 @@ void FileMentionPopup::showAt(const QPoint &pos)
         return;
     }
 
-    setParent(nullptr);
+    // Set window flags for popup behavior
+    setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
+    
+    // Set geometry at the specified position
     setGeometry(pos.x(), pos.y(), m_listView->width(), m_listView->height());
+    
+    // Show as popup
     show();
-    raise();
 }
 
 void FileMentionPopup::hidePopup()

@@ -42,7 +42,7 @@ public:
 
     ConversationThread createThread(const QString &title = QString());
     void addUserMessage(const QString &threadId, const QString &content);
-    void executeTurn(const QString &threadId);
+    void executeTurn(const QString &threadId, const QString &model = QString());
 
     void setSystemPrompt(const QString &prompt);
     void setMaxIterations(int max) { m_maxIterations = max; }
@@ -58,6 +58,7 @@ signals:
     void turnCompleted(const QString &threadId);
     void error(const QString &error);
     void runningChanged(bool running);
+    void threadUpdated(const QString &threadId);
 
 private:
     void buildRequest(const QString &threadId);
@@ -66,6 +67,7 @@ private:
     void callLLM(const QString &threadId, const QString &model);
     void callLLMInternal(const QString &threadId, const QString &model);
     QString generateTitle(const QString &firstMessage);
+    void updateProjectIdFromCurrentFile();
 
     LLMProvider *m_provider = nullptr;
     ToolRegistry *m_registry = nullptr;

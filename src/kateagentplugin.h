@@ -25,7 +25,12 @@ public:
     QObject *createView(KTextEditor::MainWindow *mw) override;
 
     KTextEditor::ConfigPage *configPage(int number = 0, QWidget *parent = nullptr) override;
-    int configPages() const override;
+
+    int configPages() const override
+    {
+        return 1;
+    }
+    
 
 signals:
     void settingsChanged();

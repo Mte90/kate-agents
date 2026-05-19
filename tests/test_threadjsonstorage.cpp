@@ -22,9 +22,8 @@ private slots:
         messages.append(LLMMessage{"user", "Hello", ""});
         messages.append(LLMMessage{"assistant", "Hi there!", ""});
         
-        QString path = ThreadJsonStorage::saveThread(threadId, messages, "Test Thread");
-        QVERIFY(!path.isEmpty());
-        QVERIFY(QFile::exists(path));
+        bool saved = ThreadJsonStorage::saveThread(threadId, messages);
+        QVERIFY(saved);
         
         QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
         QCOMPARE(loaded.size(), 2);
@@ -38,12 +37,11 @@ private slots:
         QList<LLMMessage> messages;
         messages.append(LLMMessage{"user", "Test", ""});
         
-        QString path = ThreadJsonStorage::saveThread(threadId, messages, "Test");
-        QVERIFY(!path.isEmpty());
+        bool saved = ThreadJsonStorage::saveThread(threadId, messages);
+        QVERIFY(saved);
         
         bool deleted = ThreadJsonStorage::deleteThread(threadId);
         QVERIFY(deleted);
-        QVERIFY(!QFile::exists(path));
     }
 
     void testListThreads()
@@ -52,7 +50,8 @@ private slots:
         QList<LLMMessage> messages;
         messages.append(LLMMessage{"user", "Test", ""});
         
-        ThreadJsonStorage::saveThread(threadId, messages, "Test");
+        bool saved = ThreadJsonStorage::saveThread(threadId, messages);
+        QVERIFY(saved);
         
         QStringList threads = ThreadJsonStorage::listThreads();
         QVERIFY(threads.contains(threadId));

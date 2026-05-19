@@ -1,7 +1,9 @@
 #include "agentloop.h"
 #include "editorcontext.h"
 #include "ghosttextprovider.h"
+#include "threadjson.h"
 #include <KTextEditor/MainWindow>
+#include <KTextEditor/Document>
 #include <QUuid>
 #include <QDateTime>
 #include <QJsonDocument>
@@ -78,6 +80,8 @@ void AgentLoop::setMainWindow(KTextEditor::MainWindow *mw)
         connect(m_mainWindow, &KTextEditor::MainWindow::viewCreated, this,
                 [this](KTextEditor::View *view) {
                     view->registerInlineNoteProvider(m_ghostTextProvider);
+                    // Update project ID when a new view is created
+                    updateProjectIdFromCurrentFile();
                 });
         
         // Register for existing views
@@ -85,6 +89,9 @@ void AgentLoop::setMainWindow(KTextEditor::MainWindow *mw)
         for (KTextEditor::View *view : views) {
             view->registerInlineNoteProvider(m_ghostTextProvider);
         }
+        
+        // Update project ID from current file
+        updateProjectIdFromCurrentFile();
     }
 }
 
@@ -133,9 +140,12 @@ void AgentLoop::addUserMessage(const QString &threadId, const QString &content)
     if (m_threadStorage) {
         m_threadStorage->saveThread(thread);
     }
+    
+    // Emit signal to update UI - show user message immediately
+    emit threadUpdated(threadId);
 }
 
-void AgentLoop::executeTurn(const QString &threadId)
+void AgentLoop::executeTurn(const QString &threadId, const QString &model)
 {
     // Check if thread exists
     if (!m_threads.contains(threadId)) {
@@ -155,12 +165,15 @@ void AgentLoop::executeTurn(const QString &threadId)
     m_iterationCount = 0;
     emit runningChanged(true);
 
-    // Get the model from the thread (default to first available if not set)
-    QString model = m_threads[threadId].currentModel;
-    if (model.isEmpty()) {
+    // Use provided model, or fall back to thread's model, or use first available
+    QString modelToUse = model;
+    if (modelToUse.isEmpty()) {
+        modelToUse = m_threads[threadId].currentModel;
+    }
+    if (modelToUse.isEmpty()) {
         QStringList models = m_provider->availableModels();
         if (!models.isEmpty()) {
-            model = models.first();
+            modelToUse = models.first();
         } else {
             emit error("No models available");
             m_isRunning = false;
@@ -169,8 +182,10 @@ void AgentLoop::executeTurn(const QString &threadId)
         }
     }
 
+    qDebug() << "AgentLoop: executeTurn - threadId:" << threadId << "MODEL:" << modelToUse;
+
     // Start the iterative loop - call LLM for the first time
-    callLLMInternal(threadId, model);
+    callLLMInternal(threadId, modelToUse);
 }
 
 void AgentLoop::callLLM(const QString &threadId, const QString &model)
@@ -199,6 +214,8 @@ void AgentLoop::callLLM(const QString &threadId, const QString &model)
                 assistantMsg.content = final.content;
                 m_threads[threadId].messages.push_back(assistantMsg);
             }
+            // Notify that thread has been updated
+            emit threadUpdated(threadId);
 
             // Check for tool calls
             if (!final.toolCalls.empty()) {
@@ -243,6 +260,8 @@ void AgentLoop::callLLM(const QString &threadId, const QString &model)
 
 void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
 {
+    qDebug() << "[AgentLoop] callLLMInternal - threadId:" << threadId << "MODEL:" << model;
+    
     // Build the request from thread messages
     buildRequest(threadId);
 
@@ -264,6 +283,8 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
                 assistantMsg.content = final.content;
                 m_threads[threadId].messages.push_back(assistantMsg);
             }
+            // Notify that thread has been updated
+            emit threadUpdated(threadId);
 
             // Check for tool calls
             if (!final.toolCalls.empty()) {
@@ -503,4 +524,35 @@ void AgentLoop::acceptGhostText()
 bool AgentLoop::hasGhostText() const
 {
     return m_ghostTextProvider && m_ghostTextProvider->hasSuggestion();
+}
+
+void AgentLoop::updateProjectIdFromCurrentFile()
+{
+    if (!m_mainWindow) {
+        return;
+    }
+    
+    // Get active view
+    auto views = m_mainWindow->views();
+    if (views.isEmpty()) {
+        return;
+    }
+    
+    KTextEditor::View *activeView = m_mainWindow->activeView();
+    if (!activeView) {
+        activeView = views.first();
+    }
+    
+    // Get document and file path
+    KTextEditor::Document *doc = activeView->document();
+    QString filePath = doc->url().toLocalFile();
+    
+    if (filePath.isEmpty()) {
+        return;
+    }
+    
+    // Update project ID based on the file's git repo
+    ThreadJsonStorage::setCurrentProjectIdFromFile(filePath);
+    qDebug() << "AgentLoop: updateProjectIdFromCurrentFile - filePath:" << filePath 
+             << "projectId:" << ThreadJsonStorage::getCurrentProjectId();
 }

@@ -7,8 +7,10 @@
             }
         ],
         "Description": "AI coding agent for Kate editor with tool execution and code assistance",
+        "Description[it]": "Agente AI per Kate editor con esecuzione tool e assistenza codice",
         "Icon": "utilities-terminal",
         "Name": "Kate Agent",
+        "Name[it]": "Kate Agent",
         "ServiceTypes": ["KTextEditor/Plugin"]
     }
 }

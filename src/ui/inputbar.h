@@ -32,6 +32,8 @@ public:
             m_modelCombo->setCurrentText(model);
         }
     }
+    int findModel(const QString &model) { return m_modelCombo->findText(model); }
+    void setCurrentModelIndex(int index) { if (index >= 0 && index < m_modelCombo->count()) m_modelCombo->setCurrentIndex(index); }
     void setRunningState(bool running);
     void setSystemPrompt(const QString &prompt);
     void setAgentLoop(AgentLoop *agentLoop) { m_agentLoop = agentLoop; }

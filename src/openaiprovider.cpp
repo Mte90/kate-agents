@@ -247,11 +247,37 @@ void OpenAIProvider::chatStream(
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
     
-    QNetworkReply *reply = m_nam->post(request, QJsonDocument(json).toJson());
+    QByteArray payload = QJsonDocument(json).toJson();
+    qDebug() << "[OpenAIProvider] chatStream - Sending payload:" << payload.left(400);
+    
+    QNetworkReply *reply = m_nam->post(request, payload);
     
     QObject::connect(reply, &QNetworkReply::finished, [this, reply, onChunk, onDone, onError]() {
+        qDebug() << "[OpenAIProvider] chatStream finished - error:" << reply->error() << reply->errorString();
+        
         if (reply->error() == QNetworkReply::NoError) {
-            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            QByteArray responseData = reply->readAll();
+            qDebug() << "[OpenAIProvider] chatStream response length:" << responseData.length();
+            qDebug() << "[OpenAIProvider] chatStream response (first 300):" << responseData.left(300);
+            
+            if (responseData.isEmpty()) {
+                qDebug() << "[OpenAIProvider] ERROR: Empty response";
+                onError("Empty response from API");
+                reply->deleteLater();
+                return;
+            }
+            
+            QJsonParseError parseError;
+            QJsonDocument doc = QJsonDocument::fromJson(responseData, &parseError);
+            
+            if (parseError.error != QJsonParseError::NoError) {
+                qDebug() << "[OpenAIProvider] JSON Parse Error:" << parseError.errorString();
+                qDebug() << "[OpenAIProvider] Raw response:" << responseData.left(500);
+                onError(QString("Invalid JSON: %1").arg(parseError.errorString()));
+                reply->deleteLater();
+                return;
+            }
+            
             QJsonObject root = doc.object();
             LLMResponse response;
             
@@ -277,14 +303,16 @@ void OpenAIProvider::chatStream(
                     }
                 }
             }
+            
             qDebug() << "[OpenAIProvider] Calling onDone with content length:" << response.content.length();
             onDone(response);
         } else {
             QString err = reply->errorString();
             qDebug() << "[OpenAIProvider] HTTP Error:" << reply->error() << err;
             qDebug() << "[OpenAIProvider] Response body:" << reply->readAll();
-            qDebug() << "[OpenAIProvider] Calling onError with:" << err;
-            onError(err);
+            QString errorWithUrl = QString("[%1] %2").arg(m_baseUrl).arg(err);
+            qDebug() << "[OpenAIProvider] Calling onError with:" << errorWithUrl;
+            onError(errorWithUrl);
         }
         reply->deleteLater();
     });

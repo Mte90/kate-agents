@@ -97,12 +97,14 @@ private slots:
     void onToolCallStarted(const QString &toolName, const QJsonObject &args);
     void onToolCallCompleted(const QString &toolName, const QJsonObject &result);
     void onTurnCompleted();
+    void onThreadUpdated(const QString &threadId);
     void onError(const QString &error);
     void onRunningChanged(bool running);
     void onPermissionRequested(const QString &toolName);
     void onNewChat();
     void onTabCloseRequested(int index);
     void onCurrentTabChanged(int index);
+    void updateModelFromSettings();
     void renameChatTab(int index);
 
 private:
@@ -126,6 +128,7 @@ private:
     InputBar *m_inputBar;
     ThreadStorage *m_threadStorage;
     int m_chatCounter;
+    QString m_activeThreadId;  // Thread currently receiving responses
     QString m_currentThreadId;
     bool m_hasUnsavedChanges = false;  // Track if current thread has unsaved changes
 };

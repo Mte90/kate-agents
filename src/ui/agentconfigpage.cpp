@@ -239,6 +239,17 @@ void AgentConfigPage::loadSettings()
 void AgentConfigPage::changed()
 {
     updateSettings();
+    
+    // Apply changes to provider immediately
+    if (m_plugin && m_plugin->m_config && m_plugin->m_provider) {
+        m_plugin->m_config->load();
+        auto providerCfg = m_plugin->m_config->getProviderConfig(m_plugin->m_config->getActiveProvider());
+        
+        if (auto *openaiProvider = qobject_cast<OpenAIProvider*>(m_plugin->m_provider)) {
+            openaiProvider->setBaseUrl(providerCfg.baseUrl);
+            openaiProvider->setApiKey(providerCfg.apiKey);
+        }
+    }
 }
 
 void AgentConfigPage::updateSettings()

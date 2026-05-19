@@ -25,7 +25,6 @@
 #include <KTextEditor/MainWindow>
 #include <KXMLGUIClient>
 #include <KXMLGUIFactory>
-#include <QDockWidget>
 #include <QMainWindow>
 #include <QDebug>
 #include <QTimer>
@@ -59,34 +58,31 @@ public:
         qDebug() << "AgentGuiClient: Creating toggle action...";
         auto toggleAction = ac->addAction("kateagent-toggle");
         toggleAction->setText(i18n("Toggle Kate Agent Panel"));
-        toggleAction->setIcon(QIcon::fromTheme("dialog-information"));
+        toggleAction->setIcon(QIcon::fromTheme("preferences-system"));
         ac->setDefaultShortcut(toggleAction, QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_A));
         qDebug() << "AgentGuiClient: Toggle action created";
         
-        connect(toggleAction, &QAction::triggered, this, [this]() {
+        connect(toggleAction, &QAction::triggered, m_plugin, [this]() {
             qDebug() << "AgentGuiClient: Toggle action triggered";
-            if (!m_dock) {
-                qDebug() << "AgentGuiClient: Creating dock widget...";
-                m_dock = new QDockWidget(tr("Kate Agent"), m_mainWindow->window());
-                m_dock->setObjectName("KateAgentDock");
-                m_dock->setWidget(m_panel);
-                m_dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable);
-                QMainWindow *mainWindow = qobject_cast<QMainWindow*>(m_mainWindow->window());
-                if (mainWindow) {
-                    qDebug() << "AgentGuiClient: Adding dock to main window...";
-                    mainWindow->addDockWidget(Qt::RightDockWidgetArea, m_dock);
-                    m_dock->show();
-                    qDebug() << "AgentGuiClient: Dock shown";
-                } else {
-                    qDebug() << "AgentGuiClient: MainWindow cast failed!";
-                }
+            if (!m_toolView) {
+                qDebug() << "AgentGuiClient: Creating tool view...";
+                m_toolView = m_mainWindow->createToolView(
+                    m_plugin, 
+                    "agent_panel", 
+                    KTextEditor::MainWindow::Right, 
+                    QIcon::fromTheme("preferences-system"), 
+                    i18n("Kate Agent")
+                );
+                m_panel->setParent(m_toolView);
+                m_panel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+                QVBoxLayout *layout = new QVBoxLayout(m_toolView);
+                layout->addWidget(m_panel);
+                qDebug() << "AgentGuiClient: Tool view created";
             }
-            if (m_dock->isVisible()) {
-                m_dock->hide();
+            if (m_toolView->isVisible()) {
+                m_mainWindow->hideToolView(m_toolView);
             } else {
-                m_dock->show();
-                m_dock->raise();
-                m_dock->activateWindow();
+                m_mainWindow->showToolView(m_toolView);
             }
         });
         qDebug() << "AgentGuiClient: Toggle action connected";
@@ -95,22 +91,24 @@ public:
         m_mainWindow->guiFactory()->addClient(this);
         qDebug() << "AgentGuiClient: GUI client installed";
 
-        // Auto-show dock widget after event loop starts (deferred to avoid Kate init crash)
+        // Auto-show tool view after event loop starts (deferred to avoid Kate init crash)
         QTimer::singleShot(0, this, [this]() {
-            qDebug() << "AgentGuiClient: Auto-showing dock widget";
-            if (!m_dock) {
-                m_dock = new QDockWidget(i18n("Kate Agent"), m_mainWindow->window());
-                m_dock->setObjectName("KateAgentDock");
-                m_dock->setWidget(m_panel);
-                m_dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable);
-                QMainWindow *mainWindow = qobject_cast<QMainWindow*>(m_mainWindow->window());
-                if (mainWindow) {
-                    mainWindow->addDockWidget(Qt::RightDockWidgetArea, m_dock);
-                }
+            qDebug() << "AgentGuiClient: Auto-showing tool view";
+            if (!m_toolView) {
+                m_toolView = m_mainWindow->createToolView(
+                    m_plugin, 
+                    "agent_panel", 
+                    KTextEditor::MainWindow::Right, 
+                    QIcon::fromTheme("preferences-system"), 
+                    i18n("Kate Agent")
+                );
+                m_panel->setParent(m_toolView);
+                m_panel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+                QVBoxLayout *layout = new QVBoxLayout(m_toolView);
+                layout->addWidget(m_panel);
+                qDebug() << "AgentGuiClient: Tool view created (auto-show)";
             }
-            m_dock->show();
-            m_dock->raise();
-            qDebug() << "AgentGuiClient: Dock widget auto-shown";
+            m_mainWindow->showToolView(m_toolView);
         });
 
         qDebug() << "AgentGuiClient: Constructor complete";
@@ -132,7 +130,7 @@ private:
     KateAgentPlugin *m_plugin;
     KTextEditor::MainWindow *m_mainWindow;
     AgentPanel *m_panel;
-    QDockWidget *m_dock = nullptr;
+    QWidget *m_toolView = nullptr;
 };
 
 KateAgentPlugin::KateAgentPlugin(QObject *parent, const QVariantList &) : KTextEditor::Plugin(parent)
@@ -191,11 +189,6 @@ KTextEditor::ConfigPage *KateAgentPlugin::configPage(int number, QWidget *parent
     }
     Q_UNUSED(parent)
     return new AgentConfigPage(parent, this);
-}
-
-int KateAgentPlugin::configPages() const
-{
-    return 1;
 }
 
 #include "kateagentplugin.moc"
