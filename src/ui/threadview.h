@@ -28,10 +28,10 @@ public:
     void loadMessages(const QList<LLMMessage> &messages);
     void renderThread(const QList<LLMMessage> &messages);
     void setStreamingModel(const QString &model);
-
+    QSize minimumSizeHint() const override { return QSize(0, 0); }
+    
 signals:
     void linkClicked(const QString &url);
-
 private slots:
     void toggleCursor();
 

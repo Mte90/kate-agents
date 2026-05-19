@@ -32,6 +32,8 @@ InputBar::InputBar(QWidget *parent)
     m_inputEdit = new QTextEdit(this);
     m_inputEdit->setPlaceholderText(i18n("Scrivi un messaggio all'agente... (@ per tool)"));
     m_inputEdit->setAcceptRichText(false);
+    m_inputEdit->setMinimumWidth(0);
+    m_inputEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     connect(m_inputEdit, &QTextEdit::textChanged, this, &InputBar::onTextChanged);
     mainLayout->addWidget(m_inputEdit, 1);
     

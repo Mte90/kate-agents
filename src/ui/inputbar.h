@@ -36,6 +36,7 @@ public:
     void setCurrentModelIndex(int index) { if (index >= 0 && index < m_modelCombo->count()) m_modelCombo->setCurrentIndex(index); }
     void setRunningState(bool running);
     void setSystemPrompt(const QString &prompt);
+    QSize minimumSizeHint() const override { return QSize(0, 0); }
     void setAgentLoop(AgentLoop *agentLoop) { m_agentLoop = agentLoop; }
 
 signals:

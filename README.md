@@ -2,6 +2,9 @@
 
 An AI assistant integrated into Kate that replicates Zed Editor's agent functionality: LLM chat, tool execution, context from open buffers, and iteration loops.
 
+<img width="1105" height="594" alt="Image" src="https://github.com/user-attachments/assets/3b95cecf-9c1b-4a8e-b0f4-36b716e3beda" />
+<img width="1912" height="770" alt="Image" src="https://github.com/user-attachments/assets/8ed6a944-bb19-468d-b094-912d7e6e9e7f" />
+
 ## ✨ Features
 
 ### 🤖 LLM Chat with Streaming
