@@ -29,6 +29,9 @@ public:
     void renderThread(const QList<LLMMessage> &messages);
     void setStreamingModel(const QString &model);
     QSize minimumSizeHint() const override { return QSize(0, 0); }
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
     
 signals:
     void linkClicked(const QString &url);

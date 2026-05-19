@@ -42,30 +42,20 @@ public:
         , m_mainWindow(mainwindow)
     {
         setComponentName("kateagent", i18n("Kate Agent"));
-        qDebug() << "AgentGuiClient: Constructor starting";
-        qDebug() << "AgentGuiClient: setComponentName done";
         
-        qDebug() << "AgentGuiClient: Creating AgentPanel...";
         m_panel = new AgentPanel(plugin->m_agentLoop, plugin->m_registry, 
                                  plugin->m_provider, plugin->m_config, 
                                  plugin->m_permissions);
-        qDebug() << "AgentGuiClient: AgentPanel created";
         
-        qDebug() << "AgentGuiClient: Creating action collection...";
         auto ac = actionCollection();
-        qDebug() << "AgentGuiClient: Action collection created";
         
-        qDebug() << "AgentGuiClient: Creating toggle action...";
         auto toggleAction = ac->addAction("kateagent-toggle");
         toggleAction->setText(i18n("Toggle Kate Agent Panel"));
         toggleAction->setIcon(QIcon::fromTheme("preferences-system"));
         ac->setDefaultShortcut(toggleAction, QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_A));
-        qDebug() << "AgentGuiClient: Toggle action created";
         
         connect(toggleAction, &QAction::triggered, m_plugin, [this]() {
-            qDebug() << "AgentGuiClient: Toggle action triggered";
             if (!m_toolView) {
-                qDebug() << "AgentGuiClient: Creating tool view...";
                 m_toolView = m_mainWindow->createToolView(
                     m_plugin, 
                     "agent_panel", 
@@ -78,8 +68,7 @@ public:
                 QVBoxLayout *layout = new QVBoxLayout(m_toolView);
                 layout->setContentsMargins(0, 0, 0, 0);
                 layout->setSpacing(0);
-                layout->addWidget(m_panel);
-                qDebug() << "AgentGuiClient: Tool view created";
+                layout->addWidget(m_panel, 1);
             }
             if (m_toolView->isVisible()) {
                 m_mainWindow->hideToolView(m_toolView);
@@ -87,15 +76,11 @@ public:
                 m_mainWindow->showToolView(m_toolView);
             }
         });
-        qDebug() << "AgentGuiClient: Toggle action connected";
 
-        qDebug() << "AgentGuiClient: Installing GUI client...";
         m_mainWindow->guiFactory()->addClient(this);
-        qDebug() << "AgentGuiClient: GUI client installed";
 
         // Auto-show tool view after event loop starts (deferred to avoid Kate init crash)
         QTimer::singleShot(0, this, [this]() {
-            qDebug() << "AgentGuiClient: Auto-showing tool view";
             if (!m_toolView) {
                 m_toolView = m_mainWindow->createToolView(
                     m_plugin, 
@@ -109,23 +94,17 @@ public:
                 QVBoxLayout *layout = new QVBoxLayout(m_toolView);
                 layout->setContentsMargins(0, 0, 0, 0);
                 layout->setSpacing(0);
-                layout->addWidget(m_panel);
-                qDebug() << "AgentGuiClient: Tool view created (auto-show)";
+                layout->addWidget(m_panel, 1);
             }
             m_mainWindow->showToolView(m_toolView);
         });
 
-        qDebug() << "AgentGuiClient: Constructor complete";
     }
     
     ~AgentGuiClient() override {
-        qDebug() << "AgentGuiClient: Destructor starting";
         if (m_mainWindow) {
-            qDebug() << "AgentGuiClient: Removing GUI client...";
             m_mainWindow->guiFactory()->removeClient(this);
-            qDebug() << "AgentGuiClient: GUI client removed";
         }
-        qDebug() << "AgentGuiClient: Destructor complete";
     }
     
     QWidget* panel() const { return m_panel; }
@@ -139,7 +118,6 @@ private:
 
 KateAgentPlugin::KateAgentPlugin(QObject *parent, const QVariantList &) : KTextEditor::Plugin(parent)
 {
-    qDebug() << "[KateAgentPlugin] Constructor called - plugin loading...";
     m_registry = new ToolRegistry(this);
     m_config = new ConfigManager(this);
     m_config->load();
@@ -177,7 +155,6 @@ KateAgentPlugin::~KateAgentPlugin()
 
 QObject *KateAgentPlugin::createView(KTextEditor::MainWindow *mw)
 {
-    qDebug() << "KateAgentPlugin: createView starting";
     
     m_agentLoop->setMainWindow(mw);
     

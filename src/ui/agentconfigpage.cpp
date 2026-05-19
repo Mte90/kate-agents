@@ -162,21 +162,18 @@ void AgentConfigPage::fetchModelList()
 QString AgentConfigPage::name() const
 {
     QString result = i18n("Kate Agent");
-    qDebug() << "[AgentConfigPage] name() called - returning:" << result;
     return result;
 }
 
 QString AgentConfigPage::fullName() const
 {
     QString result = i18n("Kate Agent Settings");
-    qDebug() << "[AgentConfigPage] fullName() called - returning:" << result;
     return result;
 }
 
 QIcon AgentConfigPage::icon() const
 {
     QIcon result = QIcon::fromTheme(QStringLiteral("preferences-system"));
-    qDebug() << "[AgentConfigPage] icon() called - returning:" << result;
     return result;
 }
 

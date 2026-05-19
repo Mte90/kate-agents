@@ -35,19 +35,15 @@ AgentPanel::AgentPanel(AgentLoop *agent, ToolRegistry *registry,
     , m_chatCounter(0)
     , m_currentThreadId()
 {
-    qDebug() << "AgentPanel: Constructor starting...";
     setupUi();
-    qDebug() << "AgentPanel: setupUi complete, m_tabs:" << (m_tabs ? "ok" : "NULL") << "m_inputBar:" << (m_inputBar ? "ok" : "NULL");
     
     if (m_threadStorage) {
         m_threadStorage->initialize();
     }
 
     connectSignals();
-    qDebug() << "AgentPanel: connectSignals complete";
 
     loadExistingThreads();
-    qDebug() << "AgentPanel: Constructor complete";
 }
 
 AgentPanel::~AgentPanel() = default;
@@ -157,7 +153,6 @@ void AgentPanel::connectSignals()
 void AgentPanel::updateModelFromSettings()
 {
     QString newModel = m_config->getActiveModel();
-    qDebug() << "AgentPanel: Updating model from settings:" << newModel;
     
     // Update the input bar model combo
     if (m_inputBar) {
@@ -181,7 +176,6 @@ void AgentPanel::createNewChatTab()
     m_tabs->setCurrentIndex(index);
     m_currentThreadId = threadId;
     
-    qDebug() << "AgentPanel: Created new chat tab" << index << "with ID:" << threadId;
 }
 
 void AgentPanel::closeChatTab(int index)
@@ -196,7 +190,6 @@ void AgentPanel::closeChatTab(int index)
     // Don't save, just delete the thread
     if (!threadId.isEmpty() && m_threadStorage) {
         bool deleted = m_threadStorage->deleteThread(threadId);
-        qDebug() << "AgentPanel: Deleting thread" << threadId << (deleted ? "success" : "failed");
     }
     
     QWidget *widget = m_tabs->widget(index);
@@ -211,7 +204,6 @@ void AgentPanel::closeChatTab(int index)
         createNewChatTab();
     }
     
-    qDebug() << "AgentPanel: Closed chat tab" << index;
 }
 
 void AgentPanel::updateTabTitle(int index, const QString &title)
@@ -261,7 +253,6 @@ void AgentPanel::saveCurrentThread()
     
     // Don't save if thread has no messages (empty chat)
     if (threadView->document()->isEmpty()) {
-        qDebug() << "AgentPanel: Skipping save - empty thread" << m_currentThreadId;
         return;
     }
     
@@ -278,7 +269,6 @@ void AgentPanel::saveCurrentThread()
         
         m_threadStorage->saveThread(currentThread);
         
-        qDebug() << "AgentPanel: Saved thread" << m_currentThreadId;
     }
 }
 
@@ -298,7 +288,6 @@ void AgentPanel::loadExistingThreads()
         }
     }
     
-    qDebug() << "AgentPanel: Loaded threads" << threads.size() << "updated counter to" << m_chatCounter;
     
     if (threads.isEmpty()) {
         return;
@@ -334,7 +323,6 @@ void AgentPanel::loadExistingThreads()
         m_currentThreadId = m_tabs->tabToolTip(0);
     }
     
-    qDebug() << "AgentPanel: Loaded" << threads.size() << "existing threads";
 }
 
 QString AgentPanel::generateChatTitle(int chatNumber)
@@ -392,7 +380,6 @@ void AgentPanel::onSendMessage(const QString &message)
             if (thread.currentModel != currentModel) {
                 thread.currentModel = currentModel;
                 m_threadStorage->saveThread(thread);
-                qDebug() << "AgentPanel: Updated thread model to:" << currentModel;
             }
         }
     }
@@ -418,7 +405,6 @@ void AgentPanel::onSendMessage(const QString &message)
     if (currentIdx >= 0) {
         curView = qobject_cast<ThreadView*>(m_tabs->widget(currentIdx));
         if (curView) {
-            qDebug() << "AgentPanel: Directly rendering user message";
             curView->appendUserMessage(message);
             curView->scrollToBottom();
         }
@@ -434,7 +420,6 @@ void AgentPanel::onSendMessage(const QString &message)
     
     m_inputBar->clear();
     
-    qDebug() << "AgentPanel: Sending message to agent:" << message;
 }
 
 void AgentPanel::onStopRequested()
@@ -447,7 +432,6 @@ void AgentPanel::onStopRequested()
 void AgentPanel::onModelChanged(const QString &model)
 {
     m_config->setActiveModel(model);
-    qDebug() << "AgentPanel: Model changed to:" << model;
     
     // Also update the current thread's model
     if (!m_currentThreadId.isEmpty() && m_threadStorage) {
@@ -462,7 +446,6 @@ void AgentPanel::onModelChanged(const QString &model)
         thread.currentModel = model;
         // Save the updated thread (pass the whole object)
         m_threadStorage->saveThread(thread);
-        qDebug() << "AgentPanel: Updated thread model to:" << model;
     }
 }
 
@@ -477,19 +460,15 @@ void AgentPanel::onResponseChunk(const QString &chunk)
 {
     // Find the tab for the active thread (not just currentIndex)
     if (m_activeThreadId.isEmpty()) {
-        qDebug() << "AgentPanel: onResponseChunk - m_activeThreadId is EMPTY!";
         return;
     }
     
-    qDebug() << "AgentPanel: onResponseChunk - Looking for thread:" << m_activeThreadId << "chunk length:" << chunk.length();
     
     for (int i = 0; i < m_tabs->count(); ++i) {
         QString tabThreadId = m_tabs->tabToolTip(i);
-        qDebug() << "AgentPanel: onResponseChunk - Checking tab" << i << "with threadId:" << tabThreadId;
         if (tabThreadId == m_activeThreadId) {
             ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
             if (threadView) {
-                qDebug() << "AgentPanel: onResponseChunk - Found matching tab, showing chunk";
                 threadView->showStreamingChunk(chunk);
                 m_hasUnsavedChanges = true;
             }
@@ -552,12 +531,10 @@ void AgentPanel::onRunningChanged(bool running)
 
 void AgentPanel::onPermissionRequested(const QString &toolName)
 {
-    qDebug() << "AgentPanel: Permission requested for:" << toolName;
 }
 
 void AgentPanel::reloadModels()
 {
-    qDebug() << "AgentPanel: Reloading models from provider";
     if (m_provider) {
         QStringList models = m_provider->availableModels();
         if (!models.isEmpty()) {
@@ -578,34 +555,26 @@ void AgentPanel::onThreadUpdated(const QString &threadId)
 {
     // Load the thread from storage and render it
     if (!m_threadStorage || threadId.isEmpty()) {
-        qDebug() << "AgentPanel::onThreadUpdated - FAIL: storage null or empty threadId";
         return;
     }
     
     QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
-    qDebug() << "AgentPanel::onThreadUpdated - loaded" << threads.size() << "threads from storage";
     if (!threads.contains(threadId)) {
-        qDebug() << "AgentPanel::onThreadUpdated - FAIL: threadId" << threadId << "not in storage";
-        qDebug() << "AgentPanel::onThreadUpdated - available keys:" << threads.keys();
         return;
     }
     
     ConversationThread thread = threads[threadId];
-    qDebug() << "AgentPanel::onThreadUpdated - found thread with" << thread.messages.size() << "messages";
     
     // Find the tab for this thread
     for (int i = 0; i < m_tabs->count(); ++i) {
         if (m_tabs->tabToolTip(i) == threadId) {
             ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
             if (threadView) {
-                qDebug() << "AgentPanel::onThreadUpdated - rendering thread in tab" << i;
                 threadView->renderThread(thread.messages);
             } else {
-                qDebug() << "AgentPanel::onThreadUpdated - FAIL: widget is not ThreadView";
             }
             break;
         } else if (i == m_tabs->count() - 1) {
-            qDebug() << "AgentPanel::onThreadUpdated - FAIL: no tab found with tooltip" << threadId;
         }
     }
 }

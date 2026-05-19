@@ -183,7 +183,6 @@ void AgentLoop::executeTurn(const QString &threadId, const QString &model)
         }
     }
 
-    qDebug() << "AgentLoop: executeTurn - threadId:" << threadId << "MODEL:" << modelToUse;
 
     // Start the iterative loop - call LLM for the first time
     callLLMInternal(threadId, modelToUse);
@@ -258,7 +257,6 @@ void AgentLoop::callLLM(const QString &threadId, const QString &model)
 
 void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
 {
-    qDebug() << "[AgentLoop] callLLMInternal - threadId:" << threadId << "MODEL:" << model;
     
     // Build the request from thread messages
     buildRequest(threadId);
@@ -548,6 +546,4 @@ void AgentLoop::updateProjectIdFromCurrentFile()
     
     // Update project ID based on the file's git repo
     ThreadJsonStorage::setCurrentProjectIdFromFile(filePath);
-    qDebug() << "AgentLoop: updateProjectIdFromCurrentFile - filePath:" << filePath 
-             << "projectId:" << ThreadJsonStorage::getCurrentProjectId();
 }

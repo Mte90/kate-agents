@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QTimer>
 #include <QScrollBar>
+#include <QResizeEvent>
 
 ThreadView::ThreadView(QWidget *parent)
     : QTextBrowser(parent)
@@ -171,8 +172,6 @@ void ThreadView::showStreamingChunk(const QString &chunk)
     bool isFirst = m_streamingContent.isEmpty();
     m_streamingContent += chunk;
     
-    qDebug() << "ThreadView: chunk received - length:" << chunk.length() << "content:[" << chunk.left(50) << "]";
-    qDebug() << "ThreadView: accumulated content so far:[" << m_streamingContent.left(100) << "]";
     
     // API may return tokens without spaces — insert space between consecutive word characters
     QString chunkToRender = chunk;
@@ -289,4 +288,11 @@ void ThreadView::loadMessages(const QList<LLMMessage> &messages)
 void ThreadView::renderThread(const QList<LLMMessage> &messages)
 {
     loadMessages(messages);
+}
+
+void ThreadView::resizeEvent(QResizeEvent *event)
+{
+    QTextBrowser::resizeEvent(event);
+    document()->setTextWidth(viewport()->width());
+    scrollToBottom();
 }

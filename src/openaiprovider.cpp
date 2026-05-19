@@ -128,20 +128,13 @@ QFuture<LLMResponse> OpenAIProvider::chat(
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
     
     QString jsonStr = QJsonDocument(json).toJson(QJsonDocument::Indented);
-    qDebug() << "[OpenAIProvider] Sending request to:" << url.toString();
-    qDebug() << "[OpenAIProvider] Request JSON:" << jsonStr.left(500) << (jsonStr.length() > 500 ? "... (truncated)" : "");
     
     QNetworkReply *reply = m_nam->post(request, QJsonDocument(json).toJson());
     
     QObject::connect(reply, &QNetworkReply::finished, [promise, reply]() {
-        qDebug() << "[OpenAIProvider] Response received";
         
         if (reply->error() == QNetworkReply::NoError) {
-            qDebug() << "[OpenAIProvider] HTTP 200 OK";
 QByteArray responseData = reply->readAll();
-qDebug() << "[OpenAIProvider] RAW RESPONSE (first 500 chars):" << responseData.left(500);
-qDebug() << "[OpenAIProvider] Content-Type:" << reply->header(QNetworkRequest::ContentTypeHeader).toString();
-qDebug() << "[OpenAIProvider] Parsing JSON...";            
             LLMResponse response;
             QJsonDocument doc = QJsonDocument::fromJson(responseData);
             QJsonObject root = doc.object();
@@ -202,12 +195,6 @@ void OpenAIProvider::chatStream(
     std::function<void(const LLMResponse &final)> onDone,
     std::function<void(const QString &error)> onError)
 {
-    qDebug() << "[OpenAIProvider] chatStream starting:";
-    qDebug() << "  - Model:" << model;
-    qDebug() << "  - Messages count:" << messages.size();
-    qDebug() << "  - Tools count:" << tools.size();
-    qDebug() << "  - Base URL:" << m_baseUrl;
-    qDebug() << "  - API Key (first 8 chars):" << m_apiKey.left(qMin(8, m_apiKey.length())) << "...";
     
     QJsonObject json;
     json["model"] = model;
@@ -246,20 +233,15 @@ void OpenAIProvider::chatStream(
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
     
     QByteArray payload = QJsonDocument(json).toJson();
-    qDebug() << "[OpenAIProvider] chatStream - Sending payload:" << payload.left(400);
     
     QNetworkReply *reply = m_nam->post(request, payload);
     
     QObject::connect(reply, &QNetworkReply::finished, [this, reply, onChunk, onDone, onError]() {
-        qDebug() << "[OpenAIProvider] chatStream finished - error:" << reply->error() << reply->errorString();
         
         if (reply->error() == QNetworkReply::NoError) {
             QByteArray responseData = reply->readAll();
-            qDebug() << "[OpenAIProvider] chatStream response length:" << responseData.length();
-            qDebug() << "[OpenAIProvider] chatStream response (first 300):" << responseData.left(300);
             
             if (responseData.isEmpty()) {
-                qDebug() << "[OpenAIProvider] ERROR: Empty response";
                 onError("Empty response from API");
                 reply->deleteLater();
                 return;
@@ -272,13 +254,11 @@ void OpenAIProvider::chatStream(
                 if (line.startsWith("data: ")) {
                     QByteArray jsonData = line.mid(6);
                     if (jsonData.trimmed() == "[DONE]") {
-                        qDebug() << "[OpenAIProvider] SSE stream DONE";
                         continue;
                     }
                     QJsonParseError parseError;
                     QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
                     if (parseError.error != QJsonParseError::NoError) {
-                        qDebug() << "[OpenAIProvider] SSE JSON parse error:" << parseError.errorString() << "for data:" << jsonData.left(100);
                         continue;
                     }
                     QJsonObject root = doc.object();
@@ -298,16 +278,12 @@ void OpenAIProvider::chatStream(
                     }
                 }
             }
-            qDebug() << "[OpenAIProvider] Calling onDone with content length:" << responseText.length();
             LLMResponse response;
             response.content = responseText;
             onDone(response);
         } else {
             QString err = reply->errorString();
-            qDebug() << "[OpenAIProvider] HTTP Error:" << reply->error() << err;
-            qDebug() << "[OpenAIProvider] Response body:" << reply->readAll();
             QString errorWithUrl = QString("[%1] %2").arg(m_baseUrl).arg(err);
-            qDebug() << "[OpenAIProvider] Calling onError with:" << errorWithUrl;
             onError(errorWithUrl);
         }
         reply->deleteLater();

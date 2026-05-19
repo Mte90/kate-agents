@@ -100,20 +100,16 @@ static bool saveThreadsFile(const QString &projectId, const QJsonObject &data)
     
     QJsonDocument doc(data);
     QByteArray jsonBytes = doc.toJson(QJsonDocument::Indented);
-    qDebug() << "ThreadJsonStorage::saveThreadsFile - Writing to:" << filePath;
-    qDebug() << "ThreadJsonStorage::saveThreadsFile - JSON content:" << jsonBytes.left(500);
     
     qint64 written = file.write(jsonBytes);
     file.close();
     
-    qDebug() << "ThreadJsonStorage::saveThreadsFile - Bytes written:" << written;
     
     // Verify the file was actually written
     QFile verifyFile(filePath);
     if (verifyFile.open(QIODevice::ReadOnly)) {
         QByteArray verifyData = verifyFile.readAll();
         verifyFile.close();
-        qDebug() << "ThreadJsonStorage::saveThreadsFile - Verification: File now contains" << verifyData.size() << "bytes";
     }
     
     return true;
@@ -219,14 +215,12 @@ bool ThreadJsonStorage::saveThread(const QString &threadId, const QList<LLMMessa
 bool ThreadJsonStorage::deleteThread(const QString &threadId)
 {
     QString projectId = getCurrentProjectId();
-    qDebug() << "ThreadJsonStorage::deleteThread - threadId:" << threadId << "projectId:" << projectId;
     
     QJsonObject root = loadThreadsFile(projectId);
     
     QString prefix = getProjectPrefix(projectId);
     QString threadsKey = prefix + "threads";
     
-    qDebug() << "ThreadJsonStorage::deleteThread - threadsKey:" << threadsKey << "root contains key:" << root.contains(threadsKey);
     
     if (!root.contains(threadsKey) || !root[threadsKey].isObject()) {
         qWarning() << "ThreadJsonStorage::deleteThread - threads key not found or not an object";
@@ -234,7 +228,6 @@ bool ThreadJsonStorage::deleteThread(const QString &threadId)
     }
     
     QJsonObject threadsObj = root[threadsKey].toObject();
-    qDebug() << "ThreadJsonStorage::deleteThread - threadsObj keys:" << threadsObj.keys();
     
     if (!threadsObj.contains(threadId)) {
         qWarning() << "ThreadJsonStorage::deleteThread - threadId not found in storage";
@@ -244,10 +237,8 @@ bool ThreadJsonStorage::deleteThread(const QString &threadId)
     threadsObj.remove(threadId);
     root[threadsKey] = threadsObj;
     
-    qDebug() << "ThreadJsonStorage::deleteThread - saving, new keys:" << root[threadsKey].toObject().keys();
     
     bool saved = saveThreadsFile(projectId, root);
-    qDebug() << "ThreadJsonStorage::deleteThread - save result:" << saved;
     
     return saved;
 }
