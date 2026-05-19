@@ -123,6 +123,7 @@ void AgentLoop::addUserMessage(const QString &threadId, const QString &content)
 {
     if (!m_threads.contains(threadId)) {
         m_threads[threadId] = createThread();
+        m_threads[threadId].id = threadId;  // Match UI key for storage lookup
         if (m_threadStorage) {
             m_threadStorage->saveThread(m_threads[threadId]);
         }
@@ -214,9 +215,6 @@ void AgentLoop::callLLM(const QString &threadId, const QString &model)
                 assistantMsg.content = final.content;
                 m_threads[threadId].messages.push_back(assistantMsg);
             }
-            // Notify that thread has been updated
-            emit threadUpdated(threadId);
-
             // Check for tool calls
             if (!final.toolCalls.empty()) {
                 // Check iteration limit
@@ -283,9 +281,6 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
                 assistantMsg.content = final.content;
                 m_threads[threadId].messages.push_back(assistantMsg);
             }
-            // Notify that thread has been updated
-            emit threadUpdated(threadId);
-
             // Check for tool calls
             if (!final.toolCalls.empty()) {
                 // Check iteration limit using m_currentIteration

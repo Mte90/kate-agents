@@ -62,6 +62,7 @@ void AgentPanel::setupUi()
     m_tabs->setDocumentMode(true);
     m_tabs->setTabsClosable(true);
     m_tabs->setMovable(true);
+    m_tabs->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
     // Connect middle-click to close tab
     connect(m_tabs, &CloseableTabWidget::middleTabClicked, this, [this](int index) {
@@ -76,6 +77,7 @@ void AgentPanel::setupUi()
     createNewChatTab();
     
     QWidget *newChatWidget = new QWidget();
+    newChatWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     QHBoxLayout *newChatLayout = new QHBoxLayout(newChatWidget);
     newChatLayout->setContentsMargins(4, 2, 4, 2);
     newChatLayout->setSpacing(0);
@@ -90,10 +92,10 @@ void AgentPanel::setupUi()
     newChatLayout->addWidget(newChatBtn);
     
     mainLayout->addWidget(newChatWidget);
-    mainLayout->addWidget(m_tabs, 1);
+    mainLayout->addWidget(m_tabs, 2);
     
     m_inputBar = new InputBar(this);
-    mainLayout->addWidget(m_inputBar);
+    mainLayout->addWidget(m_inputBar, 1);
     
     if (m_agent) {
         m_inputBar->setAgentLoop(m_agent);
@@ -409,8 +411,25 @@ void AgentPanel::onSendMessage(const QString &message)
     }
     
     m_agent->addUserMessage(m_currentThreadId, message);
+    
+    // Show user message directly in UI
+    int currentIdx = m_tabs->currentIndex();
+    ThreadView *curView = nullptr;
+    if (currentIdx >= 0) {
+        curView = qobject_cast<ThreadView*>(m_tabs->widget(currentIdx));
+        if (curView) {
+            qDebug() << "AgentPanel: Directly rendering user message";
+            curView->appendUserMessage(message);
+            curView->scrollToBottom();
+        }
+    }
+    
     m_activeThreadId = m_currentThreadId;  // Set active thread for response streaming
     QString currentModel = m_inputBar->currentModel();
+    // Set model name for the streaming response header
+    if (curView && !currentModel.isEmpty()) {
+        curView->setStreamingModel(currentModel);
+    }
     m_agent->executeTurn(m_currentThreadId, currentModel);  // Pass model explicitly
     
     m_inputBar->clear();
@@ -559,24 +578,34 @@ void AgentPanel::onThreadUpdated(const QString &threadId)
 {
     // Load the thread from storage and render it
     if (!m_threadStorage || threadId.isEmpty()) {
+        qDebug() << "AgentPanel::onThreadUpdated - FAIL: storage null or empty threadId";
         return;
     }
     
     QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
+    qDebug() << "AgentPanel::onThreadUpdated - loaded" << threads.size() << "threads from storage";
     if (!threads.contains(threadId)) {
+        qDebug() << "AgentPanel::onThreadUpdated - FAIL: threadId" << threadId << "not in storage";
+        qDebug() << "AgentPanel::onThreadUpdated - available keys:" << threads.keys();
         return;
     }
     
     ConversationThread thread = threads[threadId];
+    qDebug() << "AgentPanel::onThreadUpdated - found thread with" << thread.messages.size() << "messages";
     
     // Find the tab for this thread
     for (int i = 0; i < m_tabs->count(); ++i) {
         if (m_tabs->tabToolTip(i) == threadId) {
             ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
             if (threadView) {
+                qDebug() << "AgentPanel::onThreadUpdated - rendering thread in tab" << i;
                 threadView->renderThread(thread.messages);
+            } else {
+                qDebug() << "AgentPanel::onThreadUpdated - FAIL: widget is not ThreadView";
             }
             break;
+        } else if (i == m_tabs->count() - 1) {
+            qDebug() << "AgentPanel::onThreadUpdated - FAIL: no tab found with tooltip" << threadId;
         }
     }
 }

@@ -76,6 +76,8 @@ public:
                 m_panel->setParent(m_toolView);
                 m_panel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
                 QVBoxLayout *layout = new QVBoxLayout(m_toolView);
+                layout->setContentsMargins(0, 0, 0, 0);
+                layout->setSpacing(0);
                 layout->addWidget(m_panel);
                 qDebug() << "AgentGuiClient: Tool view created";
             }
@@ -105,6 +107,8 @@ public:
                 m_panel->setParent(m_toolView);
                 m_panel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
                 QVBoxLayout *layout = new QVBoxLayout(m_toolView);
+                layout->setContentsMargins(0, 0, 0, 0);
+                layout->setSpacing(0);
                 layout->addWidget(m_panel);
                 qDebug() << "AgentGuiClient: Tool view created (auto-show)";
             }

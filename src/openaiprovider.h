@@ -32,8 +32,7 @@ public:
         const QString &model,
         std::function<void(const QString &chunk)> onChunk,
         std::function<void(const LLMResponse &final)> onDone,
-        std::function<void(const QString &error)> onError,
-        double temperature = 0.7
+        std::function<void(const QString &error)> onError
     ) override;
 
     void setBaseUrl(const QString &url) { m_baseUrl = url; }

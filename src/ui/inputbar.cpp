@@ -10,6 +10,8 @@
 InputBar::InputBar(QWidget *parent)
     : QWidget(parent)
 {
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    setMinimumWidth(0);
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(5, 5, 5, 5);
     mainLayout->setSpacing(5);
@@ -29,7 +31,6 @@ InputBar::InputBar(QWidget *parent)
     // Text input area (multiline textarea)
     m_inputEdit = new QTextEdit(this);
     m_inputEdit->setPlaceholderText(i18n("Scrivi un messaggio all'agente... (@ per tool)"));
-    m_inputEdit->setMinimumHeight(60);
     m_inputEdit->setAcceptRichText(false);
     connect(m_inputEdit, &QTextEdit::textChanged, this, &InputBar::onTextChanged);
     mainLayout->addWidget(m_inputEdit, 1);
@@ -40,6 +41,7 @@ InputBar::InputBar(QWidget *parent)
     m_sendButton = new QPushButton(i18n("Invia"), this);
     connect(m_sendButton, &QPushButton::clicked, this, &InputBar::onSendClicked);
     bottomRow->addWidget(m_sendButton);
+    bottomRow->addStretch();
     
     // Profile selector (Write/Ask/Minimal)
     m_profileCombo = new QComboBox(this);

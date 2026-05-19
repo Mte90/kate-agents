@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QDebug>
 #include <QTimer>
+#include <QScrollBar>
 
 ThreadView::ThreadView(QWidget *parent)
     : QTextBrowser(parent)
@@ -14,6 +15,9 @@ ThreadView::ThreadView(QWidget *parent)
     setReadOnly(true);
     setOpenExternalLinks(false);
     setAcceptRichText(true);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    setMinimumWidth(0);
+    setMinimumHeight(0);
     
     // Initialize cursor timer for streaming effect
     m_cursorTimer = new QTimer(this);
@@ -87,7 +91,7 @@ void ThreadView::appendHtml(const QString &html)
     cursor.movePosition(QTextCursor::End);
     setTextCursor(cursor);
     insertHtml(html);
-    ensureCursorVisible();
+    scrollToBottom();
 }
 
 void ThreadView::appendUserMessage(const QString &message)
@@ -164,37 +168,86 @@ void ThreadView::appendToolResult(const QString &toolName, const QJsonObject &re
 
 void ThreadView::showStreamingChunk(const QString &chunk)
 {
-    if (m_streamingContent.isEmpty()) {
-        m_cursorBlinkCount = 0;
-        m_cursorTimer->start();
-    }
-    
+    bool isFirst = m_streamingContent.isEmpty();
     m_streamingContent += chunk;
+    
+    qDebug() << "ThreadView: chunk received - length:" << chunk.length() << "content:[" << chunk.left(50) << "]";
+    qDebug() << "ThreadView: accumulated content so far:[" << m_streamingContent.left(100) << "]";
+    
+    // API may return tokens without spaces — insert space between consecutive word characters
+    QString chunkToRender = chunk;
+    if (!m_streamingContent.isEmpty() && !chunk.isEmpty()) {
+        QChar lastChar = m_streamingContent.right(1).at(0);
+        QChar firstChar = chunk.at(0);
+        if (lastChar.isLetterOrNumber() && firstChar.isLetterOrNumber()) {
+            chunkToRender = " " + chunk;
+        }
+    }
     
     QTextCursor cursor = textCursor();
     cursor.movePosition(QTextCursor::End);
-    setTextCursor(cursor);
     
-    insertHtml(parseMarkdown(chunk));
+    // Remove the previous cursor character before inserting new content
+    if (cursor.position() > 0 && !isFirst) {
+        QTextCursor removeCursor = cursor;
+        removeCursor.movePosition(QTextCursor::PreviousCharacter, QTextCursor::KeepAnchor);
+        if (removeCursor.selectedText() == QStringLiteral("|")) {
+            removeCursor.removeSelectedText();
+        }
+    }
+    
+    setTextCursor(cursor);
+    if (isFirst) {
+        insertHtml("<hr>");
+        QString modelLabel = m_streamingModel.isEmpty() ? i18n("Agent:") : escapeHtml(m_streamingModel) + ":";
+        insertHtml(QString("<strong>%1</strong><br>").arg(modelLabel));
+        insertHtml("<div style='white-space: pre-wrap; word-break: break-word;'>");
+    }
+    {
+        QString html = parseMarkdown(chunkToRender);
+        // QTextDocument collapses leading whitespace in HTML — preserve with &nbsp;
+        while (html.startsWith(QLatin1Char(' '))) {
+            html = QStringLiteral("&nbsp;") + html.mid(1);
+        }
+        insertHtml(html);
+    }
     insertHtml("<span class='cursor'>|</span>");
-    ensureCursorVisible();
+    scrollToBottom();
+    
+    if (m_streamingContent.length() == chunk.length()) {
+        m_cursorBlinkCount = 0;
+        m_cursorTimer->start();
+    }
 }
 
 void ThreadView::endStreaming()
 {
     m_cursorTimer->stop();
     
+    // Remove the trailing cursor character from the rendered document
     QTextCursor cursor = textCursor();
     cursor.movePosition(QTextCursor::End, QTextCursor::MoveAnchor);
     if (cursor.position() > 0) {
-        cursor.movePosition(QTextCursor::PreviousCharacter, QTextCursor::KeepSelection, 13);
+        cursor.movePosition(QTextCursor::PreviousCharacter, QTextCursor::KeepAnchor);
         cursor.removeSelectedText();
     }
     
     cursor.movePosition(QTextCursor::End);
-    insertHtml("<br>");
+    insertHtml("</div><br>");
+    scrollToBottom();
     
     m_streamingContent.clear();
+}
+
+void ThreadView::setStreamingModel(const QString &model)
+{
+    m_streamingModel = model;
+}
+
+void ThreadView::scrollToBottom()
+{
+    QScrollBar *scrollBar = verticalScrollBar();
+    scrollBar->setValue(scrollBar->maximum());
 }
 
 void ThreadView::clear()

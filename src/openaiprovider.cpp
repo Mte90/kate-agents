@@ -200,12 +200,10 @@ void OpenAIProvider::chatStream(
     const QString &model,
     std::function<void(const QString &chunk)> onChunk,
     std::function<void(const LLMResponse &final)> onDone,
-    std::function<void(const QString &error)> onError,
-    double temperature)
+    std::function<void(const QString &error)> onError)
 {
     qDebug() << "[OpenAIProvider] chatStream starting:";
     qDebug() << "  - Model:" << model;
-    qDebug() << "  - Temperature:" << temperature;
     qDebug() << "  - Messages count:" << messages.size();
     qDebug() << "  - Tools count:" << tools.size();
     qDebug() << "  - Base URL:" << m_baseUrl;
@@ -213,7 +211,7 @@ void OpenAIProvider::chatStream(
     
     QJsonObject json;
     json["model"] = model;
-    json["temperature"] = temperature;
+    json["stream"] = true;
     
     QJsonArray msgArray;
     for (const auto &msg : messages) {
@@ -267,44 +265,42 @@ void OpenAIProvider::chatStream(
                 return;
             }
             
-            QJsonParseError parseError;
-            QJsonDocument doc = QJsonDocument::fromJson(responseData, &parseError);
-            
-            if (parseError.error != QJsonParseError::NoError) {
-                qDebug() << "[OpenAIProvider] JSON Parse Error:" << parseError.errorString();
-                qDebug() << "[OpenAIProvider] Raw response:" << responseData.left(500);
-                onError(QString("Invalid JSON: %1").arg(parseError.errorString()));
-                reply->deleteLater();
-                return;
-            }
-            
-            QJsonObject root = doc.object();
-            LLMResponse response;
-            
-            if (root.contains("choices") && root["choices"].isArray()) {
-                QJsonArray choices = root["choices"].toArray();
-                if (!choices.isEmpty()) {
-                    QJsonObject choice = choices.at(0).toObject();
-                    QJsonObject message = choice["message"].toObject();
-                    
-                    response.content = message["content"].toString();
-                    response.finishReason = choice["finish_reason"].toString();
-                    
-                    if (message.contains("tool_calls") && message["tool_calls"].isArray()) {
-                        QJsonArray tcArray = message["tool_calls"].toArray();
-                        for (const auto &tc : tcArray) {
-                            QJsonObject tcObj = tc.toObject();
-                            ToolCall call;
-                            call.id = tcObj["id"].toString();
-                            call.name = tcObj["function"].toObject()["name"].toString();
-                            call.arguments = tcObj["function"].toObject()["arguments"].toObject();
-                            response.toolCalls.push_back(call);
+            // Parse SSE response line by line
+            QString responseText;
+            QList<QByteArray> lines = responseData.split('\n');
+            for (const QByteArray &line : lines) {
+                if (line.startsWith("data: ")) {
+                    QByteArray jsonData = line.mid(6);
+                    if (jsonData.trimmed() == "[DONE]") {
+                        qDebug() << "[OpenAIProvider] SSE stream DONE";
+                        continue;
+                    }
+                    QJsonParseError parseError;
+                    QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
+                    if (parseError.error != QJsonParseError::NoError) {
+                        qDebug() << "[OpenAIProvider] SSE JSON parse error:" << parseError.errorString() << "for data:" << jsonData.left(100);
+                        continue;
+                    }
+                    QJsonObject root = doc.object();
+                    if (root.contains("choices") && root["choices"].isArray()) {
+                        QJsonArray choices = root["choices"].toArray();
+                        if (!choices.isEmpty()) {
+                            QJsonObject choice = choices.at(0).toObject();
+                            QJsonObject delta = choice["delta"].toObject();
+                            QString content = delta["content"].toString();
+                            if (!content.isEmpty()) {
+                                responseText += content;
+                                if (onChunk) {
+                                    onChunk(content);
+                                }
+                            }
                         }
                     }
                 }
             }
-            
-            qDebug() << "[OpenAIProvider] Calling onDone with content length:" << response.content.length();
+            qDebug() << "[OpenAIProvider] Calling onDone with content length:" << responseText.length();
+            LLMResponse response;
+            response.content = responseText;
             onDone(response);
         } else {
             QString err = reply->errorString();

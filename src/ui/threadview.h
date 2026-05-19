@@ -23,9 +23,11 @@ public:
     void showStreamingChunk(const QString &chunk);
     void endStreaming();
     void clear();
+    void scrollToBottom();
     void appendHtml(const QString &html);
     void loadMessages(const QList<LLMMessage> &messages);
     void renderThread(const QList<LLMMessage> &messages);
+    void setStreamingModel(const QString &model);
 
 signals:
     void linkClicked(const QString &url);
@@ -39,6 +41,7 @@ private:
     QString escapeHtml(const QString &text) const;
     
     QString m_streamingContent;
+    QString m_streamingModel;
     QTimer *m_cursorTimer = nullptr;
     int m_cursorBlinkCount = 0;
 };
