@@ -16,7 +16,7 @@ public:
     explicit ThreadView(QWidget *parent = nullptr);
     ~ThreadView() override;
 
-    void appendUserMessage(const QString &message);
+    void appendUserMessage(const QString &message, const QString &profile = QString());
     void appendAssistantMessage(const QString &message);
     void appendToolCall(const QString &toolName, const QJsonObject &args);
     void appendToolResult(const QString &toolName, const QJsonObject &result);

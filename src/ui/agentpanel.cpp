@@ -88,10 +88,10 @@ void AgentPanel::setupUi()
     newChatLayout->addWidget(newChatBtn);
     
     mainLayout->addWidget(newChatWidget);
-    mainLayout->addWidget(m_tabs, 2);
+    mainLayout->addWidget(m_tabs, 1);
     
     m_inputBar = new InputBar(this);
-    mainLayout->addWidget(m_inputBar, 1);
+    mainLayout->addWidget(m_inputBar, 0);
     
     if (m_agent) {
         m_inputBar->setAgentLoop(m_agent);
@@ -405,7 +405,8 @@ void AgentPanel::onSendMessage(const QString &message)
     if (currentIdx >= 0) {
         curView = qobject_cast<ThreadView*>(m_tabs->widget(currentIdx));
         if (curView) {
-            curView->appendUserMessage(message);
+            QString profile = m_inputBar->currentProfile();
+        curView->appendUserMessage(message, profile);
             curView->scrollToBottom();
         }
     }

@@ -101,7 +101,7 @@ static bool saveThreadsFile(const QString &projectId, const QJsonObject &data)
     QJsonDocument doc(data);
     QByteArray jsonBytes = doc.toJson(QJsonDocument::Indented);
     
-    qint64 written = file.write(jsonBytes);
+    file.write(jsonBytes);
     file.close();
     
     

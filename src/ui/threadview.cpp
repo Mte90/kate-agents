@@ -5,7 +5,6 @@
 #include <QTextCursor>
 #include <QTextBlock>
 #include <QJsonDocument>
-#include <QDebug>
 #include <QTimer>
 #include <QScrollBar>
 #include <QResizeEvent>
@@ -43,7 +42,8 @@ ThreadView::ThreadView(QWidget *parent)
     sheet += "pre { background-color: " + pal.color(QPalette::Base).lighter(108).name() + "; padding: 8px; border-radius: 4px; overflow-x: auto; }\n";
     sheet += "pre code { background-color: transparent; padding: 0; }\n";
     sheet += "a { color: " + pal.color(QPalette::Highlight).name() + "; text-decoration: underline; }\n";
-    sheet += "hr { border: none; border-top: 1px solid " + pal.color(QPalette::Midlight).name() + "; margin: 12px 0; }\n";
+    sheet += "hr { border: none; border-top: 1px solid " + pal.color(QPalette::Midlight).name() + "; margin: 20px 0 24px 0; }\n";
+    sheet += ".model-label { color: " + pal.color(QPalette::Highlight).name() + "; font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 4px; }\n";
     sheet += ".cursor { animation: blink 1s step-end infinite; }\n";
     sheet += "@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }\n";
     setStyleSheet(sheet);
@@ -95,18 +95,22 @@ void ThreadView::appendHtml(const QString &html)
     scrollToBottom();
 }
 
-void ThreadView::appendUserMessage(const QString &message)
+void ThreadView::appendUserMessage(const QString &message, const QString &profile)
 {
     appendHtml("<hr>");
+    QString header = i18n("User:");
+    if (!profile.isEmpty()) {
+        header += QString(" <span style='font-weight: normal; font-size: 0.85em; color: " + palette().color(QPalette::Mid).name() + ";'>[%1]</span>").arg(escapeHtml(profile));
+    }
     appendHtml(QString("<div class='user-message'><strong>%1</strong><br>%2</div>")
-               .arg(i18n("User:"), parseMarkdown(message)));
+               .arg(header, parseMarkdown(message)));
 }
 
 void ThreadView::appendAssistantMessage(const QString &message)
 {
     appendHtml("<hr>");
-    appendHtml(QString("<div class='assistant-message'><strong>%1</strong><br>%2</div>")
-               .arg(i18n("Assistant:"), parseMarkdown(message)));
+    appendHtml(QString("<div class='assistant-message'>%1</div>")
+               .arg(parseMarkdown(message)));
 }
 
 void ThreadView::appendToolCall(const QString &toolName, const QJsonObject &args)
@@ -198,8 +202,9 @@ void ThreadView::showStreamingChunk(const QString &chunk)
     setTextCursor(cursor);
     if (isFirst) {
         insertHtml("<hr>");
-        QString modelLabel = m_streamingModel.isEmpty() ? i18n("Agent:") : escapeHtml(m_streamingModel) + ":";
-        insertHtml(QString("<strong>%1</strong><br>").arg(modelLabel));
+        if (!m_streamingModel.isEmpty()) {
+            insertHtml(QString("<span class='model-label'>%1</span>").arg(escapeHtml(m_streamingModel)));
+        }
         insertHtml("<div style='white-space: pre-wrap; word-break: break-word;'>");
     }
     {
