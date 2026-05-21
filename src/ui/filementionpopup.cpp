@@ -107,13 +107,8 @@ void FileMentionPopup::showAt(const QPoint &pos)
         return;
     }
 
-    // Set window flags for popup behavior
     setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
-    
-    // Set geometry at the specified position
     setGeometry(pos.x(), pos.y(), m_listView->width(), m_listView->height());
-    
-    // Show as popup
     show();
 }
 
@@ -220,11 +215,10 @@ void FileMentionPopup::keyPressEvent(QKeyEvent *event)
             }
         }
         return;
-    } else if (event->key() == Qt::Key_Backspace) {
-        return;
-    } else if (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right) {
-        return;
     }
     
-    event->ignore();
+    // Pass key to InputBar for filtering
+    if (parentWidget()) {
+        QCoreApplication::sendEvent(parentWidget(), event);
+    }
 }

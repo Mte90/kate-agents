@@ -140,17 +140,16 @@ void InputBar::showAutocompletePopup(int atIndex)
             filtered.append(item);
         }
     }
+    filtered.sort();
     
     m_filePopup->m_filteredPaths = filtered;
     m_filePopup->m_model->setStringList(filtered);
     
     if (!filtered.isEmpty()) {
-        // Position popup below the input edit, aligned to the left
         int inputHeight = m_inputEdit->height();
         int inputY = m_inputEdit->mapToGlobal(QPoint(0, inputHeight)).y();
         int inputX = m_inputEdit->mapToGlobal(QPoint(0, 0)).x();
         
-        // Adjust for font height to position just below
         int yPos = inputY + m_inputEdit->fontMetrics().lineSpacing();
         QPoint globalPos(inputX, yPos);
         
@@ -166,17 +165,42 @@ void InputBar::findFilesRecursive(const QDir &dir, const QString &prefix, QStrin
         return;
     }
     
+    if (!dir.exists() || !dir.isReadable()) {
+        return;
+    }
+    
     QFileInfoList fileInfoList = dir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    QSet<QString> seenPaths;
+    
     for (const QFileInfo &fileInfo : fileInfoList) {
-        if (!fileInfo.exists()) {
+        QString absPath = fileInfo.absoluteFilePath();
+        
+        if (seenPaths.contains(absPath)) {
             continue;
         }
+        
+        if (!QFile::exists(absPath)) {
+            continue;
+        }
+        
+        if (!fileInfo.isFile() && !fileInfo.isDir()) {
+            continue;
+        }
+        
+        if (fileInfo.fileName().startsWith('.')) {
+            continue;
+        }
+        
+        seenPaths.insert(absPath);
         
         QString path = prefix.isEmpty() ? fileInfo.fileName() : prefix + "/" + fileInfo.fileName();
         result.append(path);
         
         if (fileInfo.isDir() && depth > 1) {
-            findFilesRecursive(fileInfo.dir(), path, result, depth - 1);
+            QDir subDir(absPath);
+            if (subDir.exists() && subDir.isReadable()) {
+                findFilesRecursive(subDir, path, result, depth - 1);
+            }
         }
     }
 }
@@ -203,6 +227,7 @@ void InputBar::insertFilePath(const QString &filePath)
         cursor.setPosition(atIndex + 1 + filePath.length() + 1);
         m_inputEdit->setTextCursor(cursor);
         m_filePopup->hidePopup();
+        m_inputEdit->setFocus();
     }
 }
 

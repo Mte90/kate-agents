@@ -240,7 +240,6 @@ void OpenAIProvider::chatStream(
         
         if (reply->error() == QNetworkReply::NoError) {
             QByteArray responseData = reply->readAll();
-            
             if (responseData.isEmpty()) {
                 onError("Empty response from API");
                 reply->deleteLater();
@@ -268,15 +267,11 @@ void OpenAIProvider::chatStream(
                             QJsonObject choice = choices.at(0).toObject();
                             QJsonObject delta = choice["delta"].toObject();
                             QString content = delta["content"].toString();
-                            qDebug() << "SSE chunk extracted:" << content << "length:" << content.length();
                             if (!content.isEmpty()) {
                                 responseText += content;
                                 if (onChunk) {
-                                    qDebug() << "Emitting onChunk with:" << content;
                                     onChunk(content);
                                 }
-                            } else {
-                                qDebug() << "Empty content from delta, skipping";
                             }
                         }
                     }

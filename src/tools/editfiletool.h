@@ -3,10 +3,11 @@
 
 #include "../toolregistry.h"
 #include <KLocalizedString>
-#include "../checkpointmanager.h"
 #include "../ui/diffpreviewdialog.h"
 #include <QFile>
 #include <QTextStream>
+#include <QDateTime>
+#include <QDir>
 
 class EditFileTool : public AgentTool
 {
@@ -84,15 +85,6 @@ public:
             };
         }
         
-        QString backupPath = CheckpointManager::createBackup(path);
-        if (backupPath.isEmpty()) {
-            return QJsonObject{
-                {"error", i18n("Cannot create backup for file: ") + path},
-                {"success", false}
-            };
-        }
-        
-        // Compute new content
         QString newContent = content;
         if (replaceAll) {
             newContent.replace(oldText, newText);
@@ -100,13 +92,14 @@ public:
             newContent.replace(oldText, newText, Qt::CaseSensitive);
         }
         
-        // Show preview dialog and wait for user confirmation
+        QString backupPath = path + ".bak." + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss");
+        QFile::copy(path, backupPath);
+        
         DiffPreviewDialog dlg(path, content, newContent);
         if (dlg.exec() != QDialog::Accepted) {
             return QJsonObject{ {"error", "Edit rejected by user"}, {"success", false} };
         }
         
-        // User accepted - write the file
         if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
             return QJsonObject{
                 {"error", i18n("Cannot write to file: ") + path},
@@ -117,8 +110,6 @@ public:
         QTextStream out(&file);
         out << newContent;
         file.close();
-        
-        CheckpointManager::cleanupOldBackups(path);
         
         return QJsonObject{
             {"success", true},

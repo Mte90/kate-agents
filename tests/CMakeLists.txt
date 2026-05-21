@@ -43,6 +43,16 @@ target_link_libraries(test_threadjsonstorage
 )
 add_test(NAME test_threadjsonstorage COMMAND test_threadjsonstorage)
 
+# Chat UI Flow test
+add_executable(test_chatuiflow test_chatuiflow.cpp)
+set_target_properties(test_chatuiflow PROPERTIES AUTOMOC ON)
+target_link_libraries(test_chatuiflow
+    Qt6::Test
+    Qt6::Core
+    Qt6::Widgets
+)
+add_test(NAME test_chatuiflow COMMAND test_chatuiflow)
+
 ## ToolRegistry test (disabled - header-only tools)
 #add_executable(test_toolregistry test_toolregistry.cpp
 #    ../src/toolregistry.cpp
