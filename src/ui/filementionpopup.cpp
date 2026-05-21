@@ -41,14 +41,40 @@ void FileMentionPopup::addAllRecursively(const QDir &dir, int depth)
         return;
     }
 
+    if (!dir.exists() || !dir.isReadable()) {
+        return;
+    }
+
+    QStringList ignorePatterns;
+    QFile gitignore(dir.filePath(".gitignore"));
+    if (gitignore.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&gitignore);
+        while (!in.atEnd()) {
+            QString line = in.readLine().trimmed();
+            if (!line.isEmpty() && !line.startsWith('#')) {
+                ignorePatterns.append(line);
+            }
+        }
+        gitignore.close();
+    }
+
     QFileInfoList fileInfoList = dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot);
     for (const QFileInfo &fileInfo : fileInfoList) {
-        if (!fileInfo.exists()) {
+        if (!fileInfo.exists() || !fileInfo.isFile() && !fileInfo.isDir()) {
             continue;
         }
+
+        if (fileInfo.fileName().startsWith('.')) {
+            continue;
+        }
+
         m_allPaths << fileInfo.absoluteFilePath();
+        
         if (fileInfo.isDir()) {
-            addAllRecursively(fileInfo.dir(), depth + 1);
+            QDir subDir(fileInfo.absoluteFilePath());
+            if (subDir.exists() && subDir.isReadable()) {
+                addAllRecursively(subDir, depth + 1);
+            }
         }
     }
 }
@@ -154,7 +180,32 @@ void FileMentionPopup::keyPressEvent(QKeyEvent *event)
     } else if (event->key() == Qt::Key_Escape) {
         hidePopup();
         return;
+    } else if (event->key() == Qt::Key_Up) {
+        if (m_listView->selectionModel()) {
+            QModelIndex current = m_listView->selectionModel()->currentIndex();
+            if (current.isValid() && current.row() > 0) {
+                m_listView->selectionModel()->setCurrentIndex(
+                    m_listView->model()->index(current.row() - 1, 0),
+                    QItemSelectionModel::SelectCurrent
+                );
+            } else if (!current.isValid() && m_model->rowCount() > 0) {
+                m_listView->selectionModel()->setCurrentIndex(
+                    m_model->index(0, 0),
+                    QItemSelectionModel::SelectCurrent
+                );
+            }
+        }
+        return;
+    } else if (event->key() == Qt::Key_Down) {
+        if (m_listView->selectionModel()) {
+            QModelIndex current = m_listView->selectionModel()->currentIndex();
+            if (current.isValid() && current.row() < m_model->rowCount() - 1) {
+                m_listView->selectionModel()->setCurrentIndex(
+                    m_listView->model()->index(current.row() + 1, 0),
+                    QItemSelectionModel::SelectCurrent
+                );
+            }
+        }
+        return;
     }
-
-    QWidget::keyPressEvent(event);
 }

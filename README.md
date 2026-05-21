@@ -7,97 +7,55 @@ An AI assistant integrated into Kate that replicates Zed Editor's agent function
 
 ## ✨ Features
 
-### 🤖 LLM Chat with Streaming
-- Real-time chat with token streaming support
+### 🤖 LLM Chat with Real-time Streaming
+- Type messages and receive AI responses as they stream in real-time
 - Compatible with any OpenAI-compatible API (OpenAI, Anthropic, Ollama, LM Studio, etc.)
-- Flexible configuration: API key, base URL, model, system prompt
+- Model selection dropdown to switch between different AI models
+- Agent profiles: **Write** (code changes), **Ask** (questions/debugging), **Minimal** (concise)
+- Streaming text with proper word wrapping and formatting
 
 ### 🔧 Tool Execution
-The plugin automatically executes tools based on LLM instructions:
+The AI can automatically execute tools based on your request:
 
 | Tool | Description |
 |------|-------------|
-| **ReadFile** | Reads files from the filesystem |
-| **EditFile** | Modifies files with applyable diffs |
-| **Grep** | Searches patterns in the project |
-| **Terminal** | Executes commands (sandboxed) |
-| **WebSearch** | Searches via DuckDuckGo |
+| **read_file** | Reads file contents to understand your code |
+| **edit_file** | Suggests code changes with diff preview |
+| **grep** | Searches for patterns across the project |
+| **find_files** | Lists files matching a pattern |
+| **terminal** | Executes shell commands (sandboxed for safety) |
+| **web_search** | Searches the web via DuckDuckGo |
 
-**Security sandboxing:** Terminal commands block `rm`, `curl`, `wget`, `sh`, `bash`, `cp`, `mv`, `python`, `perl`, `ruby` for protection.
+**Security:** Terminal commands block dangerous operations (`rm`, `curl`, `wget`, `sh`, `bash`, `cp`, `mv`, `python`, `perl`, `ruby`).
 
 ### 📚 Automatic Buffer Context
-- Automatically detects files open in Kate
-- Injects context into LLM prompts (limit: 2000 characters)
-- Configurable toggle in settings
+- Files you're currently editing are automatically included in the AI's context
+- Configurable: enable/disable in settings
+- Helps the AI understand your project without manual file mentions
 
-### 🔄 Intelligent REPL Loop
-- LLM → Tool → Result → LLM (automatic cycle)
-- Up to 20 iterations to prevent infinite loops
-- Tool output displayed inline in the chat
+### 🔄 Intelligent Agent Loop
+- AI → Tool → Result → AI (automatic cycle)
+- Maximum 20 iterations to prevent infinite loops
+- Tool outputs displayed inline in the chat
+- AI decides which tools to use based on your request
 
-### 📋 Multiple Chat Tabs
-- Support for multiple concurrent chats
-- Each tab has its own conversation history
-- Close individual tabs with X button
-- Create new chats with + button
-- Automatic tab naming (Chat 1, Chat 2, etc.)
-- Tab titles update based on first message
+### 📋 Multiple Chat Sessions
+- Create unlimited chat tabs with the `+` button
+- Each tab maintains its own conversation history
+- Close tabs with the `×` button
+- Named automatically (Chat 1, Chat 2, etc.)
+- All conversations persist across Kate restarts
+
+### @-Mentions for Quick File Reference
+- Type `@` to trigger file autocomplete
+- Fuzzy search across your project files
+- Files are automatically read and included in the AI's context
+- Example: `@src/main.cpp fix the null pointer issue`
 
 ### 💾 Conversation Persistence
-- Automatic thread saving to JSON files
-- Conversation history loading on startup
-- **Project-based isolation**: Chats are organized by git repository or file
-- Path: `~/.config/kate/agents/`
-- File naming:
-  - Git repos: `{repo-name}_chat_YYYYMMDD_N.json` (e.g., `kate-agents_chat_20260513_1.json`)
-  - Single files: `{filename}_chat_YYYYMMDD_N.json` (e.g., `main.cpp_chat_20260513_1.json`)
-  - Directories: `{dirname}_chat_YYYYMMDD_N.json` (e.g., `projects_chat_20260513_1.json`)
-- Auto-save every 30 seconds
-- Auto-save when switching tabs
-- Auto-save after each turn completes
-
-### 👤 Agent Profiles
-Three modes for different scenarios:
-
-| Profile | Use |
-|---------|-----|
-| **Write** | Code writing, substantial changes |
-| **Ask** | Questions, explanations, debugging |
-| **Minimal** | Concise responses, reduced context |
-
-### @-Mentions for Files and Web
-- Type `@` for file autocomplete
-- Fuzzy search on project paths
-- Support for URLs and web searches
-
-### 📊 Diff Preview
-- Side-by-side preview before applying changes
-- Multi-file support
-- Explicit user confirmation required
-
-### 💾 Checkpoint Backups
-- Timestamped backups before every modification: `.bak.YYYYMMDD-HHMMSS`
-- Maximum 5 backups per file (oldest are deleted)
-- Easy recovery of previous file versions
-
-### 👻 Ghost Text (Inlay Hints)
-- Inline suggestions while typing
-- Accept with Tab key
-- Implemented via KTextEditor InlineNoteProvider API
-
-### 📋 Context Menu
-- Right-click in editor → "Ask agent about this"
-- Sends current selection to the agent
-
-### ⚙️ Configuration Page
-Accessible from: `Settings → Configure Kate → Plugins → Kate Agent`
-
-Available settings:
-- API Key
-- Base URL (for self-hosted providers)
-- Model (e.g., `gpt-4`, `claude-3`, `llama3`)
-- Custom system prompt
-- Buffer context toggle (enabled by default)
+- All chat histories save automatically
+- Survives Kate restarts
+- Organized by project (git repository)
 
 ## 📦 Installation
 
@@ -137,16 +95,6 @@ sudo cp src/kateagentplugin.json \
 5. Press `Ctrl+Alt+A` to open the panel
 
 ## 🚀 Usage
-
-### API Configuration
-
-1. Open the Agent panel (`Ctrl+Alt+A`)
-2. Click the gear icon (⚙️)
-3. Enter:
-   - **API Key**: Your API key
-   - **Base URL**: `https://api.openai.com/v1` (or self-hosted)
-   - **Model**: `gpt-4o`, `claude-3-5-sonnet`, `llama3:70b`, etc.
-   - **System prompt**: (optional) customize behavior
 
 ### Chat with the Agent
 
