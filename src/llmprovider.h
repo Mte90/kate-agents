@@ -13,6 +13,7 @@
 struct LLMMessage {
     QString role;
     QString content;
+    QString profile;
     QString toolCallId;
     
     LLMMessage() = default;

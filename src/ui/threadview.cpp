@@ -28,29 +28,32 @@ ThreadView::ThreadView(QWidget *parent)
     m_cursorTimer->setInterval(500);
     connect(m_cursorTimer, &QTimer::timeout, this, &ThreadView::toggleCursor);
     
-    document()->setDefaultStyleSheet("");
-    
-    // Set up palette-aware stylesheet for chat messages
+    // Widget-level stylesheet (background color only)
     QPalette pal = palette();
-    QString sheet;
-    sheet += "QTextBrowser { background-color: " + pal.color(QPalette::Base).name() + "; color: " + pal.color(QPalette::Text).name() + "; }\n";
-    sheet += ".user-message { background-color: " + pal.color(QPalette::AlternateBase).lighter(110).name() + "; border-left: 3px solid " + pal.color(QPalette::Highlight).name() + "; border-radius: 6px; padding: 10px 12px; margin: 8px 0; }\n";
-    sheet += ".assistant-message { background-color: " + pal.color(QPalette::Base).lighter(105).name() + "; border-left: 3px solid " + pal.color(QPalette::Mid).name() + "; border-radius: 6px; padding: 10px 12px; margin: 8px 0; }\n";
-    sheet += ".tool-call { background-color: " + pal.color(QPalette::Base).name() + "; border: 1px solid " + pal.color(QPalette::Midlight).name() + "; border-radius: 4px; padding: 6px 8px; margin: 6px 0; font-family: monospace; font-size: 0.9em; }\n";
-    sheet += ".tool-result { background-color: " + pal.color(QPalette::Base).name() + "; border: 1px solid " + pal.color(QPalette::Mid).name() + "; border-radius: 4px; padding: 6px 8px; margin: 6px 0; font-family: monospace; font-size: 0.9em; }\n";
-    sheet += ".tool-result.error { background-color: " + pal.color(QPalette::Base).lighter(108).name() + "; border: 1px solid " + pal.color(QPalette::Text).name() + "; }\n";
-    sheet += ".terminal-output { background-color: " + pal.color(QPalette::Base).name() + "; border: 1px solid " + pal.color(QPalette::Midlight).name() + "; border-radius: 4px; margin: 6px 0; overflow: hidden; }\n";
-    sheet += ".terminal-header { background-color: " + pal.color(QPalette::Mid).name() + "; padding: 6px 8px; font-family: monospace; font-size: 0.9em; border-bottom: 1px solid " + pal.color(QPalette::Midlight).name() + "; }\n";
-    sheet += ".terminal-body { padding: 8px; font-family: monospace; font-size: 0.85em; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }\n";
-    sheet += "code { background-color: " + pal.color(QPalette::Base).lighter(105).name() + "; padding: 2px 4px; border-radius: 3px; font-family: monospace; font-size: 0.9em; }\n";
-    sheet += "pre { background-color: " + pal.color(QPalette::Base).lighter(108).name() + "; padding: 8px; border-radius: 4px; overflow-x: auto; }\n";
-    sheet += "pre code { background-color: transparent; padding: 0; }\n";
-    sheet += "a { color: " + pal.color(QPalette::Highlight).name() + "; text-decoration: underline; }\n";
-    sheet += "hr { border: none; border-top: 1px solid " + pal.color(QPalette::Midlight).name() + "; margin: 20px 0 24px 0; }\n";
-    sheet += ".model-label { color: " + pal.color(QPalette::Highlight).name() + "; font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 4px; }\n";
-    sheet += ".cursor { animation: blink 1s step-end infinite; }\n";
-    sheet += "@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }\n";
-    setStyleSheet(sheet);
+    QString widgetSheet;
+    widgetSheet += "QTextBrowser { background-color: " + pal.color(QPalette::Base).name() + "; color: " + pal.color(QPalette::Text).name() + "; }";
+    setStyleSheet(widgetSheet);
+    
+    // Document-level stylesheet for HTML content
+    QString docSheet;
+    docSheet += ".user-message { background-color: " + pal.color(QPalette::AlternateBase).lighter(110).name() + "; border-left: 3px solid " + pal.color(QPalette::Highlight).name() + "; border-radius: 6px; padding: 10px 12px; margin: 8px 0; white-space: pre-wrap; word-break: break-word; }\n";
+    docSheet += ".assistant-message { background-color: " + pal.color(QPalette::Base).lighter(105).name() + "; border-left: 3px solid " + pal.color(QPalette::Mid).name() + "; border-radius: 6px; padding: 10px 12px; margin: 8px 0; white-space: pre-wrap; word-break: break-word; }\n";
+    docSheet += ".tool-call { background-color: " + pal.color(QPalette::Base).name() + "; border: 1px solid " + pal.color(QPalette::Midlight).name() + "; border-radius: 4px; padding: 6px 8px; margin: 6px 0; font-family: monospace; font-size: 0.9em; }\n";
+    docSheet += ".tool-result { background-color: " + pal.color(QPalette::Base).name() + "; border: 1px solid " + pal.color(QPalette::Mid).name() + "; border-radius: 4px; padding: 6px 8px; margin: 6px 0; font-family: monospace; font-size: 0.9em; }\n";
+    docSheet += ".tool-result.error { background-color: " + pal.color(QPalette::Base).lighter(108).name() + "; border: 1px solid " + pal.color(QPalette::Text).name() + "; }\n";
+    docSheet += ".terminal-output { background-color: " + pal.color(QPalette::Base).name() + "; border: 1px solid " + pal.color(QPalette::Midlight).name() + "; border-radius: 4px; margin: 6px 0; overflow: hidden; }\n";
+    docSheet += ".terminal-header { background-color: " + pal.color(QPalette::Mid).name() + "; padding: 6px 8px; font-family: monospace; font-size: 0.9em; border-bottom: 1px solid " + pal.color(QPalette::Midlight).name() + "; }\n";
+    docSheet += ".terminal-body { padding: 8px; font-family: monospace; font-size: 0.85em; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }\n";
+    docSheet += "code { background-color: " + pal.color(QPalette::Base).lighter(105).name() + "; padding: 2px 4px; border-radius: 3px; font-family: monospace; font-size: 0.9em; }\n";
+    docSheet += "pre { background-color: " + pal.color(QPalette::Base).lighter(108).name() + "; padding: 8px; border-radius: 4px; overflow-x: auto; }\n";
+    docSheet += "pre code { background-color: transparent; padding: 0; }\n";
+    docSheet += "a { color: " + pal.color(QPalette::Highlight).name() + "; text-decoration: underline; }\n";
+    docSheet += "hr { border: none; border-top: 1px solid " + pal.color(QPalette::Midlight).name() + "; margin: 20px 0 24px 0; }\n";
+    docSheet += ".model-label { color: " + pal.color(QPalette::Highlight).name() + "; font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 4px; }\n";
+    docSheet += ".model-name { font-weight: bold; }\n";
+    docSheet += ".cursor { animation: blink 1s step-end infinite; }\n";
+    docSheet += "@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }\n";
+    document()->setDefaultStyleSheet(docSheet);
 }
 
 ThreadView::~ThreadView() = default;
@@ -196,7 +199,7 @@ void ThreadView::showStreamingChunk(const QString &chunk)
     if (isFirst) {
         insertHtml("<hr>");
         if (!m_streamingModel.isEmpty()) {
-            insertHtml(QString("<span class='model-label'>%1</span>").arg(escapeHtml(m_streamingModel)));
+            insertHtml(QString("<span style='font-weight: bold; font-size: 0.85em;'>%1</span><br>").arg(escapeHtml(m_streamingModel)));
         }
         insertHtml("<div style='white-space: pre-wrap; word-break: break-word;'>");
     }
@@ -272,7 +275,7 @@ void ThreadView::loadMessages(const QList<LLMMessage> &messages)
     
     for (const auto &msg : messages) {
         if (msg.role == "user") {
-            appendUserMessage(msg.content);
+            appendUserMessage(msg.content, msg.profile);
         } else if (msg.role == "assistant") {
             appendAssistantMessage(msg.content);
         }

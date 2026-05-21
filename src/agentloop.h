@@ -41,7 +41,7 @@ public:
     bool hasGhostText() const;
 
     ConversationThread createThread(const QString &title = QString());
-    void addUserMessage(const QString &threadId, const QString &content);
+    void addUserMessage(const QString &threadId, const QString &content, const QString &profile = QString());
     void executeTurn(const QString &threadId, const QString &model = QString());
 
     void setSystemPrompt(const QString &prompt);

@@ -119,7 +119,7 @@ ConversationThread AgentLoop::createThread(const QString &title)
     return thread;
 }
 
-void AgentLoop::addUserMessage(const QString &threadId, const QString &content)
+void AgentLoop::addUserMessage(const QString &threadId, const QString &content, const QString &profile)
 {
     if (!m_threads.contains(threadId)) {
         m_threads[threadId] = createThread();
@@ -134,6 +134,7 @@ void AgentLoop::addUserMessage(const QString &threadId, const QString &content)
     LLMMessage userMsg;
     userMsg.role = "user";
     userMsg.content = content;
+    userMsg.profile = profile;
     thread.messages.push_back(userMsg);
 
     thread.updatedAt = QDateTime::currentDateTime();

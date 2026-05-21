@@ -397,7 +397,8 @@ void AgentPanel::onSendMessage(const QString &message)
         saveCurrentThread();
     }
     
-    m_agent->addUserMessage(m_currentThreadId, message);
+    QString currentProfile = m_inputBar->currentProfile();
+    m_agent->addUserMessage(m_currentThreadId, message, currentProfile);
     
     // addUserMessage emits threadUpdated → renderThread → user message is already shown in UI.
     // Set active thread for response streaming and get the current view.

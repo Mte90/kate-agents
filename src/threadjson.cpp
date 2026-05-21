@@ -166,6 +166,7 @@ QList<LLMMessage> ThreadJsonStorage::loadThread(const QString &threadId)
         
         msg.role = msgObj["role"].toString();
         msg.content = msgObj["content"].toString();
+        msg.profile = msgObj["profile"].toString();
         msg.toolCallId = msgObj["toolCallId"].toString();
         
         messages.append(msg);
@@ -193,9 +194,8 @@ bool ThreadJsonStorage::saveThread(const QString &threadId, const QList<LLMMessa
         QJsonObject msgObj;
         msgObj["role"] = msg.role;
         msgObj["content"] = msg.content;
+        msgObj["profile"] = msg.profile;
         msgObj["toolCallId"] = msg.toolCallId;
-        
-        // Note: toolCalls not serialized (LLMMessage doesn't have this field)
         
         messagesArray.append(msgObj);
     }
