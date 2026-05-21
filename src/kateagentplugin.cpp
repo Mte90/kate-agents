@@ -65,10 +65,16 @@ public:
                 );
                 m_panel->setParent(m_toolView);
                 m_panel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-                QVBoxLayout *layout = new QVBoxLayout(m_toolView);
-                layout->setContentsMargins(0, 0, 0, 0);
-                layout->setSpacing(0);
-                layout->addWidget(m_panel, 1);
+                if (auto *tvLayout = qobject_cast<QBoxLayout*>(m_toolView->layout())) {
+                    tvLayout->addWidget(m_panel, 1);
+                } else if (m_toolView->layout()) {
+                    m_toolView->layout()->addWidget(m_panel);
+                } else {
+                    QVBoxLayout *layout = new QVBoxLayout(m_toolView);
+                    layout->setContentsMargins(0, 0, 0, 0);
+                    layout->setSpacing(0);
+                    layout->addWidget(m_panel, 1);
+                }
             }
             if (m_toolView->isVisible()) {
                 m_mainWindow->hideToolView(m_toolView);
@@ -91,10 +97,16 @@ public:
                 );
                 m_panel->setParent(m_toolView);
                 m_panel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-                QVBoxLayout *layout = new QVBoxLayout(m_toolView);
-                layout->setContentsMargins(0, 0, 0, 0);
-                layout->setSpacing(0);
-                layout->addWidget(m_panel, 1);
+                if (auto *tvLayout = qobject_cast<QBoxLayout*>(m_toolView->layout())) {
+                    tvLayout->addWidget(m_panel, 1);
+                } else if (m_toolView->layout()) {
+                    m_toolView->layout()->addWidget(m_panel);
+                } else {
+                    QVBoxLayout *layout = new QVBoxLayout(m_toolView);
+                    layout->setContentsMargins(0, 0, 0, 0);
+                    layout->setSpacing(0);
+                    layout->addWidget(m_panel, 1);
+                }
             }
             m_mainWindow->showToolView(m_toolView);
         });
