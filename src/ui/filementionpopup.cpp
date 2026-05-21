@@ -1,4 +1,5 @@
 #include "filementionpopup.h"
+#include <QTextEdit>
 
 FileMentionPopup::FileMentionPopup(QWidget *parent)
     : QWidget(parent)
@@ -217,8 +218,11 @@ void FileMentionPopup::keyPressEvent(QKeyEvent *event)
         return;
     }
     
-    // Pass key to InputBar for filtering
     if (parentWidget()) {
-        QCoreApplication::sendEvent(parentWidget(), event);
+        QWidget *inputEdit = parentWidget()->findChild<QTextEdit *>();
+        if (inputEdit) {
+            QKeyEvent *keyEvent = new QKeyEvent(QEvent::KeyPress, event->key(), event->modifiers(), event->text(), event->isAutoRepeat(), event->count());
+            QCoreApplication::postEvent(inputEdit, keyEvent);
+        }
     }
 }
