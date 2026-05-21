@@ -17,18 +17,6 @@ target_link_libraries(test_configmanager
 )
 add_test(NAME test_configmanager COMMAND test_configmanager)
 
-# CheckpointManager test
-add_executable(test_checkpointmanager test_checkpointmanager.cpp
-    ../src/checkpointmanager.cpp
-)
-target_link_libraries(test_checkpointmanager
-    Qt6::Test
-    Qt6::Core
-    Qt6::Widgets
-    Qt6::Concurrent
-)
-add_test(NAME test_checkpointmanager COMMAND test_checkpointmanager)
-
 # EditorContext test
 add_executable(test_editorcontext test_editorcontext.cpp
     ../src/editorcontext.cpp

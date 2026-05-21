@@ -59,19 +59,32 @@ void FileMentionPopup::addAllRecursively(const QDir &dir, int depth)
     }
 
     QFileInfoList fileInfoList = dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot);
+    QSet<QString> seenPaths;
+    
     for (const QFileInfo &fileInfo : fileInfoList) {
-        if (!fileInfo.exists() || !fileInfo.isFile() && !fileInfo.isDir()) {
+        QString absPath = fileInfo.absoluteFilePath();
+        
+        if (seenPaths.contains(absPath)) {
             continue;
         }
-
+        
+        if (!QFile::exists(absPath)) {
+            continue;
+        }
+        
+        if (!fileInfo.isFile() && !fileInfo.isDir()) {
+            continue;
+        }
+        
         if (fileInfo.fileName().startsWith('.')) {
             continue;
         }
-
-        m_allPaths << fileInfo.absoluteFilePath();
+        
+        seenPaths.insert(absPath);
+        m_allPaths << absPath;
         
         if (fileInfo.isDir()) {
-            QDir subDir(fileInfo.absoluteFilePath());
+            QDir subDir(absPath);
             if (subDir.exists() && subDir.isReadable()) {
                 addAllRecursively(subDir, depth + 1);
             }
@@ -207,5 +220,11 @@ void FileMentionPopup::keyPressEvent(QKeyEvent *event)
             }
         }
         return;
+    } else if (event->key() == Qt::Key_Backspace) {
+        return;
+    } else if (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right) {
+        return;
     }
+    
+    event->ignore();
 }

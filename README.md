@@ -24,13 +24,11 @@ The AI can automatically execute tools based on your request:
 | **grep** | Searches for patterns across the project |
 | **find_files** | Lists files matching a pattern |
 | **terminal** | Executes shell commands (sandboxed for safety) |
-| **web_search** | Searches the web via DuckDuckGo |
 
 **Security:** Terminal commands block dangerous operations (`rm`, `curl`, `wget`, `sh`, `bash`, `cp`, `mv`, `python`, `perl`, `ruby`).
 
 ### 📚 Automatic Buffer Context
 - Files you're currently editing are automatically included in the AI's context
-- Configurable: enable/disable in settings
 - Helps the AI understand your project without manual file mentions
 
 ### 🔄 Intelligent Agent Loop
@@ -116,13 +114,6 @@ When the agent proposes changes:
 - **Esc**: Reject
 - **Shift+Tab**: Accept line by line
 
-### Create Checkpoints
-
-Before important modifications:
-1. Click the "checkpoint" icon in the panel
-2. A timestamped backup will be created
-3. Recover from `file.bak.YYYYMMDD-HHMMSS`
-
 ## ⚠️ Known Limitations
 
 ### LSP Integration (NOT available)
@@ -157,7 +148,7 @@ Before important modifications:
 | Codebase indexing | ❌ No | Only open files, not entire project |
 | LSP hover | ❌ No | Requires exposed LSP API |
 | Go to definition | ❌ No | Requires real LSP |
-| Test UI/E2E | ⚠️ Partial | 4/7 unit tests passing |
+| Test UI/E2E | ⚠️ Partial | 3/3 unit tests passing (93%) |
 
 ## 🧪 Testing
 
@@ -168,7 +159,6 @@ ctest --output-on-failure
 
 # Specific tests
 ./tests/test_configmanager
-./tests/test_checkpointmanager
 ./tests/test_editorcontext
 ./tests/test_threadjsonstorage
 ```

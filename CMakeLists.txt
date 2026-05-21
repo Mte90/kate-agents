@@ -52,8 +52,6 @@ set(PROJECT_SOURCES
     src/permissionmanager.cpp
     src/configmanager.h
     src/configmanager.cpp
-    src/checkpointmanager.h
-    src/checkpointmanager.cpp
     src/editorcontext.h
     src/editorcontext.cpp
     src/toolregistry.h
