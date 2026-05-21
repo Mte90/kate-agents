@@ -155,7 +155,8 @@ QList<LLMMessage> ThreadJsonStorage::loadThread(const QString &threadId)
         return messages;
     }
     
-    QJsonArray messagesArray = threadsObj[threadId].toArray();
+    QJsonObject threadObj = threadsObj[threadId].toObject();
+    QJsonArray messagesArray = threadObj["messages"].toArray();
     
     for (const QJsonValue &msgValue : messagesArray) {
         if (!msgValue.isObject()) continue;

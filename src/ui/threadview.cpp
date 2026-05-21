@@ -19,6 +19,10 @@ ThreadView::ThreadView(QWidget *parent)
     setMinimumWidth(0);
     setMinimumHeight(0);
     
+    // Ensure proper word wrapping and text reflow
+    setWordWrapMode(QTextOption::WordWrap);
+    document()->setTextWidth(400);
+
     // Initialize cursor timer for streaming effect
     m_cursorTimer = new QTimer(this);
     m_cursorTimer->setInterval(500);
@@ -176,17 +180,6 @@ void ThreadView::showStreamingChunk(const QString &chunk)
     bool isFirst = m_streamingContent.isEmpty();
     m_streamingContent += chunk;
     
-    
-    // API may return tokens without spaces — insert space between consecutive word characters
-    QString chunkToRender = chunk;
-    if (!m_streamingContent.isEmpty() && !chunk.isEmpty()) {
-        QChar lastChar = m_streamingContent.right(1).at(0);
-        QChar firstChar = chunk.at(0);
-        if (lastChar.isLetterOrNumber() && firstChar.isLetterOrNumber()) {
-            chunkToRender = " " + chunk;
-        }
-    }
-    
     QTextCursor cursor = textCursor();
     cursor.movePosition(QTextCursor::End);
     
@@ -208,7 +201,7 @@ void ThreadView::showStreamingChunk(const QString &chunk)
         insertHtml("<div style='white-space: pre-wrap; word-break: break-word;'>");
     }
     {
-        QString html = parseMarkdown(chunkToRender);
+        QString html = parseMarkdown(chunk);
         // QTextDocument collapses leading whitespace in HTML — preserve with &nbsp;
         while (html.startsWith(QLatin1Char(' '))) {
             html = QStringLiteral("&nbsp;") + html.mid(1);
@@ -293,6 +286,12 @@ void ThreadView::loadMessages(const QList<LLMMessage> &messages)
 void ThreadView::renderThread(const QList<LLMMessage> &messages)
 {
     loadMessages(messages);
+}
+
+void ThreadView::showEvent(QShowEvent *event)
+{
+    QTextBrowser::showEvent(event);
+    document()->setTextWidth(viewport()->width());
 }
 
 void ThreadView::resizeEvent(QResizeEvent *event)

@@ -189,7 +189,7 @@ void AgentPanel::closeChatTab(int index)
     
     // Don't save, just delete the thread
     if (!threadId.isEmpty() && m_threadStorage) {
-        bool deleted = m_threadStorage->deleteThread(threadId);
+        m_threadStorage->deleteThread(threadId);
     }
     
     QWidget *widget = m_tabs->widget(index);
@@ -399,21 +399,13 @@ void AgentPanel::onSendMessage(const QString &message)
     
     m_agent->addUserMessage(m_currentThreadId, message);
     
-    // Show user message directly in UI
+    // addUserMessage emits threadUpdated → renderThread → user message is already shown in UI.
+    // Set active thread for response streaming and get the current view.
     int currentIdx = m_tabs->currentIndex();
-    ThreadView *curView = nullptr;
-    if (currentIdx >= 0) {
-        curView = qobject_cast<ThreadView*>(m_tabs->widget(currentIdx));
-        if (curView) {
-            QString profile = m_inputBar->currentProfile();
-        curView->appendUserMessage(message, profile);
-            curView->scrollToBottom();
-        }
-    }
+    ThreadView *curView = qobject_cast<ThreadView*>(m_tabs->widget(currentIdx));
     
-    m_activeThreadId = m_currentThreadId;  // Set active thread for response streaming
+    m_activeThreadId = m_currentThreadId;
     QString currentModel = m_inputBar->currentModel();
-    // Set model name for the streaming response header
     if (curView && !currentModel.isEmpty()) {
         curView->setStreamingModel(currentModel);
     }
@@ -530,7 +522,7 @@ void AgentPanel::onRunningChanged(bool running)
     m_inputBar->setRunningState(running);
 }
 
-void AgentPanel::onPermissionRequested(const QString &toolName)
+void AgentPanel::onPermissionRequested(const QString & /*toolName*/)
 {
 }
 

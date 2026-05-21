@@ -48,6 +48,7 @@ class CloseableTabWidget : public QTabWidget {
     Q_OBJECT
 public:
     explicit CloseableTabWidget(QWidget *parent = nullptr) : QTabWidget(parent) {}
+    QSize minimumSizeHint() const override { return QSize(0, 0); }
 
 signals:
     void middleTabClicked(int index);
@@ -83,6 +84,8 @@ public:
                         QWidget *parent = nullptr);
     ~AgentPanel() override;
 
+    QSize sizeHint() const override { return QSize(0, 0); }
+    QSize minimumSizeHint() const override { return QSize(0, 0); }
     QAction *createAction();
 
 public slots:
