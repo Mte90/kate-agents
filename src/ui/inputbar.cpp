@@ -265,6 +265,10 @@ bool InputBar::eventFilter(QObject *obj, QEvent *event)
                 m_agentLoop->acceptGhostText();
                 return true; // Event handled
             }
+        } else if (keyEvent->key() == Qt::Key_Return && keyEvent->modifiers() & Qt::ControlModifier) {
+            // Ctrl+Enter pressed - send message
+            onSendClicked();
+            return true; // Event handled
         }
     }
     return QWidget::eventFilter(obj, event);

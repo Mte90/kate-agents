@@ -3,7 +3,7 @@
 An AI assistant integrated into Kate that replicates Zed Editor's agent functionality: LLM chat, tool execution, context from open buffers, and iteration loops.
 
 <img width="1105" height="594" alt="Image" src="https://github.com/user-attachments/assets/3b95cecf-9c1b-4a8e-b0f4-36b716e3beda" />
-<img width="1912" height="770" alt="Image" src="https://github.com/user-attachments/assets/8ed6a944-bb19-468d-b094-912d7e6e9e7f" />
+<img width="1807" height="916" alt="Image" src="https://github.com/user-attachments/assets/8e7a4c0d-2549-42b1-867e-1db79b49b41a" />
 
 ## ✨ Features
 
@@ -13,6 +13,7 @@ An AI assistant integrated into Kate that replicates Zed Editor's agent function
 - Model selection dropdown to switch between different AI models
 - Agent profiles: **Write** (code changes), **Ask** (questions/debugging), **Minimal** (concise)
 - Streaming text with proper word wrapping and formatting
+- **Keyboard shortcuts:** `Ctrl+Enter` to send message, `Enter` for new line
 
 ### 🔧 Tool Execution
 The AI can automatically execute tools based on your request:
