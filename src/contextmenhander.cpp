@@ -6,8 +6,6 @@
 ContextMenuHandler::ContextMenuHandler(AgentLoop *agentLoop, QObject *parent)
     : QObject(parent)
     , m_agentLoop(agentLoop)
-    , m_contextMenu(nullptr)
-    , m_askAgentAction(nullptr)
 {
 }
 
@@ -18,29 +16,39 @@ void ContextMenuHandler::installContextMenu(KTextEditor::View *view)
         return;
     }
 
-    m_contextMenu = view->contextMenu();
-    if (!m_contextMenu) {
+    if (m_viewActions.contains(view)) {
+        return;
+    }
+
+    QMenu *menu = view->contextMenu();
+    if (!menu) {
         qWarning() << "ContextMenuHandler: context menu is null";
         return;
     }
 
-    m_askAgentAction = new QAction("Ask agent about this", this);
-    connect(m_askAgentAction, &QAction::triggered, this, &ContextMenuHandler::onAskAgentAboutThis);
+    QAction *action = new QAction("Ask agent about this", this);
+    action->setParent(view);
+    connect(action, &QAction::triggered, this, &ContextMenuHandler::onAskAgentAboutThis);
 
-    m_contextMenu->addSeparator();
-    m_contextMenu->addAction(m_askAgentAction);
+    menu->addSeparator();
+    menu->addAction(action);
+    m_viewActions.insert(view, action);
+
+    connect(view, &QObject::destroyed, this, [this, view]() {
+        m_viewActions.remove(view);
+    });
 }
 
 void ContextMenuHandler::uninstallContextMenu(KTextEditor::View *view)
 {
-    if (!view || !m_contextMenu || !m_askAgentAction) {
+    if (!view) {
         return;
     }
 
-    m_contextMenu->removeAction(m_askAgentAction);
-    m_askAgentAction->deleteLater();
-    m_askAgentAction = nullptr;
-    m_contextMenu = nullptr;
+    QAction *action = m_viewActions.take(view);
+    if (action) {
+        action->deleteLater();
+    }
 }
 
 void ContextMenuHandler::onAskAgentAboutThis()
@@ -50,7 +58,12 @@ void ContextMenuHandler::onAskAgentAboutThis()
         return;
     }
 
-    auto view = qobject_cast<KTextEditor::View*>(sender()->parent());
+    auto *action = qobject_cast<QAction*>(sender());
+    if (!action) {
+        return;
+    }
+
+    auto *view = qobject_cast<KTextEditor::View*>(action->parent());
     if (!view) {
         qWarning() << "ContextMenuHandler: Could not get view from action";
         return;
@@ -68,16 +81,12 @@ void ContextMenuHandler::onAskAgentAboutThis()
     QString context;
     auto cursorPos = view->cursorPosition();
     
-    // Get surrounding context using document text range
     int start = qMax(0, cursorPos.line() - 5);
     int end = cursorPos.line() + 5;
     
-    // Use document->text() to get lines - it takes (startLine, startCol, endLine, endCol)
     for (int i = start; i <= end; ++i) {
         QString line;
-        // Safely get line text - avoid broken APIs
         if (i >= 0) {
-            // Get line as plain text using KTextEditor::Range
             KTextEditor::Range range(i, 0, i, 1);
             line = view->document()->text(range).trimmed();
         }
@@ -96,5 +105,10 @@ void ContextMenuHandler::onAskAgentAboutThis()
         .arg(cursorCol)
         .arg(context);
 
-    m_agentLoop->addUserMessage(QString(), message);
+    QString threadId = m_agentLoop->currentThreadId();
+    if (threadId.isEmpty()) {
+        qWarning() << "ContextMenuHandler: No active thread, cannot send message";
+        return;
+    }
+    m_agentLoop->addUserMessage(threadId, message);
 }

@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QStringList>
+#include <QCryptographicHash>
 
 namespace KTextEditor {
 class MainWindow;
@@ -38,6 +39,14 @@ private:
     int cursorColumn = -1;
     QString selection;         // truncated to 1000 chars
     QStringList openFileList;
+    
+    // Caching
+    bool m_dirty = true;
+    QString m_lastFilePath;
+    QString m_lastContentHash;
+    int m_lastCursorLine = -1;
+    int m_lastCursorColumn = -1;
+    QString m_lastSelection;
 };
 
 #endif // EDITORCONTEXT_H

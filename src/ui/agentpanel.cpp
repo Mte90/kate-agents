@@ -19,6 +19,7 @@
 #include <QJsonDocument>
 #include <QDate>
 #include <QRegularExpression>
+#include <QMessageBox>
 
 AgentPanel::AgentPanel(AgentLoop *agent, ToolRegistry *registry,
                        LLMProvider *provider, ConfigManager *config,
@@ -134,6 +135,7 @@ void AgentPanel::connectSignals()
         connect(m_agent, &AgentLoop::error, this, &AgentPanel::onError);
         connect(m_agent, &AgentLoop::runningChanged, this, &AgentPanel::onRunningChanged);
     connect(m_agent, &AgentLoop::threadUpdated, this, &AgentPanel::onThreadUpdated);
+    connect(m_agent, &AgentLoop::titleGenerated, this, &AgentPanel::onTitleGenerated);
     } else {
         qWarning() << "AgentPanel: m_agent is NULL - cannot connect AgentLoop signals";
     }
@@ -183,6 +185,8 @@ void AgentPanel::closeChatTab(int index)
     if (index < 0 || index >= m_tabs->count()) {
         return;
     }
+    
+
     
     // Get the thread ID before removing the tab
     QString threadId = m_tabs->tabToolTip(index);
@@ -361,6 +365,12 @@ QAction *AgentPanel::createAction()
 
 void AgentPanel::onSendMessage(const QString &message)
 {
+    // Re-entrancy guard: prevent sending while agent is running
+    if (m_agent && m_agent->isRunning()) {
+        qWarning() << "Agent is already running, ignoring send request";
+        return;
+    }
+    
     if (!m_agent || message.trimmed().isEmpty() || m_currentThreadId.isEmpty()) {
         return;
     }
@@ -385,17 +395,6 @@ void AgentPanel::onSendMessage(const QString &message)
     }
     
     m_hasUnsavedChanges = true;
-    
-    int currentIndex = m_tabs->currentIndex();
-    QString currentTitle = m_tabs->tabText(currentIndex);
-    if (currentTitle.startsWith("Chat ")) {
-        QString newTitle = message.left(30).trimmed();
-        if (newTitle.length() > 20) {
-            newTitle = newTitle.left(20) + "...";
-        }
-        updateTabTitle(currentIndex, newTitle);
-        saveCurrentThread();
-    }
     
     QString currentProfile = m_inputBar->currentProfile();
     m_agent->addUserMessage(m_currentThreadId, message, currentProfile);
@@ -504,6 +503,36 @@ void AgentPanel::onTurnCompleted()
     }
     
     saveCurrentThread();
+    
+    // Trigger async LLM title generation if tab still has default title
+    if (m_agent && currentIndex >= 0) {
+        QString currentTitle = m_tabs->tabText(currentIndex);
+        if (currentTitle.startsWith("Chat ") && !m_pendingTitleTabs.contains(m_currentThreadId)) {
+            m_pendingTitleTabs.insert(m_currentThreadId);
+            m_agent->generateTitleFromMessages(m_currentThreadId);
+        }
+    }
+}
+
+void AgentPanel::onTitleGenerated(const QString &threadId, const QString &title)
+{
+    m_pendingTitleTabs.remove(threadId);
+
+    // Find the tab for this thread and update its title
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        if (m_tabs->tabToolTip(i) == threadId) {
+            updateTabTitle(i, title);
+            // Update thread title in persistent storage
+            if (m_threadStorage) {
+                QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
+                if (threads.contains(threadId)) {
+                    threads[threadId].title = title;
+                    m_threadStorage->saveThread(threads[threadId]);
+                }
+            }
+            break;
+        }
+    }
 }
 
 void AgentPanel::onError(const QString &error)
@@ -523,8 +552,29 @@ void AgentPanel::onRunningChanged(bool running)
     m_inputBar->setRunningState(running);
 }
 
-void AgentPanel::onPermissionRequested(const QString & /*toolName*/)
+void AgentPanel::onPermissionRequested(const QString &toolName)
 {
+    if (toolName.isEmpty() || !m_permissions) {
+        return;
+    }
+    
+    QMessageBox msgBox;
+    msgBox.setWindowTitle(tr("Tool Permission Required"));
+    msgBox.setText(tr("Tool '%1' wants to be executed. Allow?").arg(toolName));
+    
+    QPushButton* allowBtn = msgBox.addButton(tr("Allow (once)"), QMessageBox::ActionRole);
+    QPushButton* alwaysBtn = msgBox.addButton(tr("Always Allow"), QMessageBox::ActionRole);
+    msgBox.addButton(tr("Deny"), QMessageBox::RejectRole);
+    
+    msgBox.exec();
+    
+    if (msgBox.clickedButton() == allowBtn) {
+        m_permissions->grantPermission(toolName);
+    } else if (msgBox.clickedButton() == alwaysBtn) {
+        m_permissions->grantPermission(toolName);
+        m_permissions->setToolPolicy(toolName, PermissionPolicy::Allow);
+    }
+    // If denyBtn was clicked or dialog closed, do nothing (permission denied by default)
 }
 
 void AgentPanel::reloadModels()

@@ -23,7 +23,13 @@ QJsonObject ToolRegistry::executeTool(const QString &name, const QJsonObject &ar
     }
 
     if (m_tools[name]->requiresPermission()) {
-        return QJsonObject{{"error", "Permission denied for tool: " + name}, {"success", false}};
+        // Check if permission is allowed
+        if (m_permissionManager && !m_permissionManager->isAllowed(name)) {
+            // Request permission - this will emit signal for UI to show dialog
+            m_permissionManager->requestPermission(name);
+            return QJsonObject{{"error", "Permission requested. Please confirm in dialog."}, {"success", false}};
+        }
+        // If no permission manager or allowed, proceed
     }
 
     if (timeoutSeconds <= 0) {

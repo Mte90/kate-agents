@@ -52,6 +52,9 @@ public:
 
     bool bufferContextEnabled() const { return m_bufferContextEnabled; }
     void setBufferContextEnabled(bool enabled) { m_bufferContextEnabled = enabled; }
+    
+    bool panelVisible() const { return m_panelVisible; }
+    void setPanelVisible(bool visible) { m_panelVisible = visible; }
 
 signals:
     void configChanged();
@@ -65,6 +68,7 @@ private:
     QString m_systemPrompt;
     std::vector<ProviderConfig> m_providers;
     bool m_bufferContextEnabled = true;
+    bool m_panelVisible = false;
 };
 
 #endif

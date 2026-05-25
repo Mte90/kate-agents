@@ -52,10 +52,10 @@ public:
     }
 
     QJsonObject execute(const QJsonObject &args) override {
-        QString pattern = args["path"].toString();
+        QString pattern = args["pattern"].toString();
         QString searchPath = args["path"].toString(".");
         QString include = args["include"].toString("*");
-        int maxResults = args["max_results"].toInt(50);
+        int maxResults = args["max_results"].toInt(100);
         
         QRegularExpression regex(pattern);
         if (!regex.isValid()) {
@@ -68,11 +68,26 @@ public:
         QJsonArray results;
         int count = 0;
         
-        QDir dir(searchPath);
-        QFileInfoList files = dir.entryInfoList(QStringList() << include, QDir::Files | QDir::Readable);
+        // Use QDirIterator for recursive search
+        QStringList excludeDirs = {".git", ".hg", ".svn", ".venv", "venv", "node_modules", "dist", "build", "bin", "__pycache__"};
+        QDirIterator it(searchPath, QStringList() << include, QDir::Files | QDir::Readable, QDirIterator::Subdirectories);
         
-        for (const QFileInfo &fileInfo : files) {
-            if (count >= maxResults) break;
+        while (it.hasNext() && count < maxResults) {
+            QString filePath = it.next();
+            QFileInfo fileInfo(filePath);
+            
+            // Skip files in excluded directories by checking path components
+            bool skipFile = false;
+            QString absolutePath = fileInfo.absoluteFilePath();
+            for (const QString &segment : absolutePath.split(QLatin1Char('/'))) {
+                if (excludeDirs.contains(segment)) {
+                    skipFile = true;
+                    break;
+                }
+            }
+            if (skipFile) {
+                continue;
+            }
             
             QFile file(fileInfo.absoluteFilePath());
             if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) continue;

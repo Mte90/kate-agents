@@ -18,6 +18,7 @@
 #include "tools/findpathtool.h"
 #include "tools/listdirectorytool.h"
 #include "tools/createdirectorytool.h"
+#include "tools/applydifftool.h"
 #include <KActionCollection>
 #include <KLocalizedString>
 #include <KPluginFactory>
@@ -43,9 +44,9 @@ public:
     {
         setComponentName("kateagent", i18n("Kate Agent"));
         
-        m_panel = new AgentPanel(plugin->m_agentLoop, plugin->m_registry, 
-                                 plugin->m_provider, plugin->m_config, 
-                                 plugin->m_permissions);
+        m_panel = new AgentPanel(plugin->agentLoop(), plugin->registry(), 
+                                 plugin->provider(), plugin->config(), 
+                                 plugin->permissionManager());
         
         auto ac = actionCollection();
         
@@ -76,6 +77,10 @@ public:
                     layout->addWidget(m_panel, 1);
                 }
             }
+            
+            // Save panel visibility state
+            m_plugin->config()->setPanelVisible(m_toolView->isVisible());
+            
             if (m_toolView->isVisible()) {
                 m_mainWindow->hideToolView(m_toolView);
             } else {
@@ -142,6 +147,12 @@ KateAgentPlugin::KateAgentPlugin(QObject *parent, const QVariantList &) : KTextE
     m_agentLoop = new AgentLoop(m_provider, m_registry, this);
     m_permissions = new PermissionManager(this);
     
+    // Wire PermissionManager into ToolRegistry
+    m_registry->setPermissionManager(m_permissions);
+    
+    // Initialize context menu handler
+    m_contextMenuHandler = new ContextMenuHandler(m_agentLoop, this);
+    
     // Register all tools
     m_registry->registerTool(new ReadFileTool(this));
     m_registry->registerTool(new EditFileTool(this));
@@ -153,6 +164,7 @@ KateAgentPlugin::KateAgentPlugin(QObject *parent, const QVariantList &) : KTextE
     m_registry->registerTool(new FindPathTool(this));
     m_registry->registerTool(new ListDirectoryTool(this));
     m_registry->registerTool(new CreateDirectoryTool(this));
+    m_registry->registerTool(new ApplyDiffTool(this));
 }
 
 KateAgentPlugin::~KateAgentPlugin()
@@ -167,6 +179,19 @@ KateAgentPlugin::~KateAgentPlugin()
 
 QObject *KateAgentPlugin::createView(KTextEditor::MainWindow *mw)
 {
+    // Set up context menu installation for all views
+    connect(mw, &KTextEditor::MainWindow::viewCreated, this, [this](KTextEditor::View *view) {
+        if (!view || !m_contextMenuHandler || m_installedViews.contains(view)) {
+            return;
+        }
+        m_installedViews.insert(view);
+        m_contextMenuHandler->installContextMenu(view);
+
+        // Clean up when view is destroyed
+        connect(view, &QObject::destroyed, this, [this, view]() {
+            m_installedViews.remove(view);
+        });
+    });
     
     m_agentLoop->setMainWindow(mw);
     

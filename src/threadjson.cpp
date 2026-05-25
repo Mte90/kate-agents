@@ -175,7 +175,28 @@ QList<LLMMessage> ThreadJsonStorage::loadThread(const QString &threadId)
     return messages;
 }
 
-bool ThreadJsonStorage::saveThread(const QString &threadId, const QList<LLMMessage> &messages, const QString &currentModel)
+QString ThreadJsonStorage::loadThreadTitle(const QString &threadId)
+{
+    QString projectId = getCurrentProjectId();
+    QJsonObject root = loadThreadsFile(projectId);
+    
+    QString prefix = getProjectPrefix(projectId);
+    QString threadsKey = prefix + "threads";
+    
+    if (!root.contains(threadsKey) || !root[threadsKey].isObject()) {
+        return QString();
+    }
+    
+    QJsonObject threadsObj = root[threadsKey].toObject();
+    if (!threadsObj.contains(threadId) || !threadsObj[threadId].isObject()) {
+        return QString();
+    }
+    
+    QJsonObject threadObj = threadsObj[threadId].toObject();
+    return threadObj["title"].toString();
+}
+
+bool ThreadJsonStorage::saveThread(const QString &threadId, const QList<LLMMessage> &messages, const QString &currentModel, const QString &title)
 {
     QString projectId = getCurrentProjectId();
     QJsonObject root = loadThreadsFile(projectId);
@@ -205,6 +226,10 @@ bool ThreadJsonStorage::saveThread(const QString &threadId, const QList<LLMMessa
     threadObj["messages"] = messagesArray;
     if (!currentModel.isEmpty()) {
         threadObj["currentModel"] = currentModel;
+    }
+    // Save title if provided
+    if (!title.isEmpty()) {
+        threadObj["title"] = title;
     }
     
     threadsObj[threadId] = threadObj;

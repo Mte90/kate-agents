@@ -48,8 +48,10 @@ public:
     void setMaxIterations(int max) { m_maxIterations = max; }
 
     bool isRunning() const { return m_isRunning; }
+    QString currentThreadId() const { return m_currentThreadId; }
     void abort();
     void saveAllThreads();
+    void generateTitleFromMessages(const QString &threadId);
 
 signals:
     void responseChunk(const QString &chunk);
@@ -59,12 +61,12 @@ signals:
     void error(const QString &error);
     void runningChanged(bool running);
     void threadUpdated(const QString &threadId);
+    void titleGenerated(const QString &threadId, const QString &title);
 
 private:
     void buildRequest(const QString &threadId);
     void handleToolCalls(const std::vector<ToolCall> &toolCalls, const QString &threadId);
     void addToolResult(const QString &threadId, const QString &toolCallId, const QString &toolName, const QJsonObject &result);
-    void callLLM(const QString &threadId, const QString &model);
     void callLLMInternal(const QString &threadId, const QString &model);
     QString generateTitle(const QString &firstMessage);
     void updateProjectIdFromCurrentFile();
@@ -75,7 +77,6 @@ private:
     KTextEditor::MainWindow *m_mainWindow = nullptr;
     QString m_systemPrompt;
     int m_maxIterations = 20;
-    int m_iterationCount = 0;
     int m_currentIteration = 0;
     bool m_isRunning = false;
     QString m_currentThreadId;

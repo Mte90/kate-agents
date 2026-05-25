@@ -7,6 +7,7 @@
 #include <QTabWidget>
 #include <QTabBar>
 #include <QAction>
+#include <QSet>
 #include <QMouseEvent>
 
 #include "threadview.h"
@@ -109,6 +110,7 @@ private slots:
     void onCurrentTabChanged(int index);
     void updateModelFromSettings();
     void renameChatTab(int index);
+    void onTitleGenerated(const QString &threadId, const QString &title);
 
 private:
     // Methods
@@ -134,6 +136,7 @@ private:
     QString m_activeThreadId;  // Thread currently receiving responses
     QString m_currentThreadId;
     bool m_hasUnsavedChanges = false;  // Track if current thread has unsaved changes
+    QSet<QString> m_pendingTitleTabs;  // Tabs awaiting LLM title generation
 };
 
 #endif

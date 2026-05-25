@@ -82,6 +82,8 @@ public:
         std::function<void(const QString &error)> onError
     ) = 0;
 
+    virtual void abort() {}
+
 signals:
     void modelListChanged();
 };

@@ -35,6 +35,8 @@ public:
         std::function<void(const QString &error)> onError
     ) override;
 
+    void abort() override;
+
     void setBaseUrl(const QString &url) { m_baseUrl = url; }
     void setApiKey(const QString &key) { m_apiKey = key; }
     void setDefaultModel(const QString &model) { m_defaultModel = model; }
@@ -50,6 +52,10 @@ private:
     QString m_apiKey;
     QString m_defaultModel;
     QNetworkAccessManager *m_nam;
+    QNetworkReply *m_currentReply = nullptr;
+    QByteArray m_lineBuffer;  // SSE line buffer for incremental parsing
+    int m_retryCount = 0;
+    static const int MAX_RETRIES = 3;
 };
 
 #endif

@@ -2,6 +2,7 @@
 #define TOOLREGISTRY_H
 
 #include "llmprovider.h"
+#include "permissionmanager.h"
 #include <QObject>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -53,6 +54,8 @@ public:
     QJsonObject executeTool(const QString &name, const QJsonObject &args, int timeoutSeconds = -1);
     bool hasTool(const QString &name) const;
     bool requiresPermission(const QString &name) const;
+    
+    void setPermissionManager(PermissionManager *manager) { m_permissionManager = manager; }
 
 signals:
     void toolRegistered(const QString &name);
@@ -60,6 +63,7 @@ signals:
 
 private:
     QMap<QString, AgentTool*> m_tools;
+    PermissionManager *m_permissionManager = nullptr;
 };
 
 #endif

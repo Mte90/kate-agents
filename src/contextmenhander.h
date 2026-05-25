@@ -2,6 +2,7 @@
 #define CONTEXTMENHANDLER_H
 
 #include <QObject>
+#include <QMap>
 #include <QMenu>
 #include <KTextEditor/View>
 #include <KTextEditor/Document>
@@ -23,8 +24,6 @@ private slots:
 
 private:
     AgentLoop *m_agentLoop;
-    QMenu *m_contextMenu;
-    QAction *m_askAgentAction;
+    QMap<KTextEditor::View*, QAction*> m_viewActions;
 };
-
 #endif // CONTEXTMENHANDLER_H

@@ -203,14 +203,11 @@ void ThreadView::showStreamingChunk(const QString &chunk)
         }
         insertHtml("<div style='white-space: pre-wrap; word-break: break-word;'>");
     }
-    {
-        QString html = parseMarkdown(chunk);
-        // QTextDocument collapses leading whitespace in HTML — preserve with &nbsp;
-        while (html.startsWith(QLatin1Char(' '))) {
-            html = QStringLiteral("&nbsp;") + html.mid(1);
-        }
-        insertHtml(html);
-    }
+    
+    // Use insertText to preserve all whitespace exactly
+    // insertHtml collapses spaces across chunk boundaries in QTextDocument
+    cursor.insertText(chunk);
+    
     insertHtml("<span class='cursor'>|</span>");
     scrollToBottom();
     

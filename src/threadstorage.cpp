@@ -107,7 +107,7 @@ bool ThreadStorage::saveThread(const ConversationThread &thread)
         messages.append(lmMsg);
     }
     
-    return ThreadJsonStorage::saveThread(thread.id, messages, thread.currentModel);
+    return ThreadJsonStorage::saveThread(thread.id, messages, thread.currentModel, thread.title);
 }
 
 bool ThreadStorage::saveAllThreads(const QMap<QString, ConversationThread> &threads)

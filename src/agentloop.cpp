@@ -164,8 +164,6 @@ void AgentLoop::executeTurn(const QString &threadId, const QString &model)
     m_isRunning = true;
     m_currentThreadId = threadId;
     m_currentIteration = 0;
-    m_iterationCount = 0;
-    emit runningChanged(true);
 
     // Use provided model, or fall back to thread's model, or use first available
     QString modelToUse = model;
@@ -187,73 +185,6 @@ void AgentLoop::executeTurn(const QString &threadId, const QString &model)
 
     // Start the iterative loop - call LLM for the first time
     callLLMInternal(threadId, modelToUse);
-}
-
-void AgentLoop::callLLM(const QString &threadId, const QString &model)
-{
-    // Increment iteration count
-    ++m_iterationCount;
-
-    // Build the request from thread messages
-    buildRequest(threadId);
-
-    // Call the LLM with streaming
-    m_provider->chatStream(
-        m_currentRequest,
-        m_currentTools,
-        model,
-        // onChunk - emit each chunk as it arrives
-        [this](const QString &chunk) {
-            emit responseChunk(chunk);
-        },
-        // onDone - handle final response
-        [this, threadId, model](const LLMResponse &final) {
-            // Add assistant message to thread
-            if (!final.content.isEmpty()) {
-                LLMMessage assistantMsg;
-                assistantMsg.role = "assistant";
-                assistantMsg.content = final.content;
-                m_threads[threadId].messages.push_back(assistantMsg);
-            }
-            // Check for tool calls
-            if (!final.toolCalls.empty()) {
-                // Check iteration limit
-                if (m_iterationCount >= m_maxIterations) {
-                    emit error(QString("Max iterations (%1) reached").arg(m_maxIterations));
-                    m_isRunning = false;
-                    emit runningChanged(false);
-                    emit turnCompleted(threadId);
-                    return;
-                }
-
-                // Handle tool calls - they will trigger another LLM call
-                handleToolCalls(final.toolCalls, threadId);
-                
-                // After handling tool calls, call LLM again if within iteration limit
-                if (m_iterationCount < m_maxIterations) {
-                    callLLM(threadId, model);
-                } else {
-                    emit turnCompleted(threadId);
-                    m_isRunning = false;
-                    emit runningChanged(false);
-                }
-            } else {
-                // No more tool calls, turn is complete
-                if (m_threadStorage && m_threads.contains(threadId)) {
-                    m_threadStorage->saveThread(m_threads[threadId]);
-                }
-                emit turnCompleted(threadId);
-                m_isRunning = false;
-                emit runningChanged(false);
-            }
-        },
-        // onError - handle errors
-        [this](const QString &errMsg) {
-            emit error(QString("LLM streaming error: %1").arg(errMsg));
-            m_isRunning = false;
-            emit runningChanged(false);
-        }
-    );
 }
 
 void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
@@ -331,6 +262,11 @@ void AgentLoop::abort()
 {
     m_isRunning = false;
     emit runningChanged(false);
+    
+    // Abort the provider's network request if available
+    if (m_provider) {
+        m_provider->abort();
+    }
 }
 
 void AgentLoop::saveAllThreads()
@@ -344,8 +280,11 @@ void AgentLoop::saveAllThreads()
 
 void AgentLoop::buildRequest(const QString &threadId)
 {
-    constexpr int maxMessages = 100;
-
+    // Token-based context window: ~4 chars per token, target ~4000 tokens (16000 chars)
+    constexpr int maxTokens = 4000;
+    constexpr int charsPerToken = 4;
+    constexpr int maxChars = maxTokens * charsPerToken;
+    
     auto it = m_threads.find(threadId);
     if (it == m_threads.end()) {
         emit error(QString("Thread not found: %1").arg(threadId));
@@ -358,11 +297,26 @@ void AgentLoop::buildRequest(const QString &threadId)
 
     bool hasSystemPrompt = !thread.messages.empty() && thread.messages[0].role == "system";
 
-    if (totalMessages > static_cast<size_t>(maxMessages)) {
-        if (hasSystemPrompt) {
-            startIndex = totalMessages - (maxMessages - 1);
-        } else {
-            startIndex = totalMessages - maxMessages;
+    // Calculate total content length and truncate if needed
+    int totalChars = 0;
+    for (size_t i = static_cast<size_t>(hasSystemPrompt ? 1 : 0); i < totalMessages; ++i) {
+        totalChars += thread.messages[i].content.length();
+    }
+
+    // If over budget, truncate oldest messages (keeping system prompt)
+    if (totalChars > maxChars) {
+        int currentChars = totalChars;
+        startIndex = hasSystemPrompt ? 1 : 0;
+        
+        // Remove oldest messages until under budget
+        while (startIndex < totalMessages && currentChars > maxChars) {
+            currentChars -= thread.messages[startIndex].content.length();
+            startIndex++;
+        }
+        
+        // Ensure we keep at least some messages (minimum 10 non-system messages)
+        if (startIndex > totalMessages - static_cast<size_t>(10)) {
+            startIndex = std::max(static_cast<size_t>(hasSystemPrompt ? 1 : 0), totalMessages - static_cast<size_t>(10));
         }
     }
 
@@ -416,6 +370,9 @@ void AgentLoop::handleToolCalls(const std::vector<ToolCall> &toolCalls, const QS
     indexedResults.resize(toolCalls.size());
     
     // Launch parallel execution for all tool calls
+    QVector<QFuture<QJsonObject>> futures;
+    futures.resize(toolCalls.size());
+    
     for (size_t i = 0; i < toolCalls.size(); ++i) {
         const ToolCall &toolCall = toolCalls[i];
         const QString &toolCallId = toolCall.id;
@@ -423,7 +380,7 @@ void AgentLoop::handleToolCalls(const std::vector<ToolCall> &toolCalls, const QS
         const QJsonObject &args = toolCall.arguments;
         
         // Use QtConcurrent to execute tool calls in parallel
-        QFuture<QJsonObject> future = QtConcurrent::run(
+        futures[i] = QtConcurrent::run(
             [&, i]() -> QJsonObject {
                 // Emit start signal (all start signals fire immediately)
                 emit toolCallStarted(toolName, args);
@@ -438,8 +395,10 @@ void AgentLoop::handleToolCalls(const std::vector<ToolCall> &toolCalls, const QS
                 return result;
             }
         );
-        
-        // Wait for all futures to complete before emitting completion signals
+    }
+    
+    // Wait for ALL futures to complete (true parallel execution)
+    for (auto &future : futures) {
         future.waitForFinished();
     }
     
@@ -480,6 +439,67 @@ QString AgentLoop::generateTitle(const QString &firstMessage)
     }
     return firstMessage;
 }
+void AgentLoop::generateTitleFromMessages(const QString &threadId)
+{
+    if (!m_provider || !m_threads.contains(threadId)) {
+        return;
+    }
+
+    QString model = m_threads[threadId].currentModel;
+    if (model.isEmpty()) {
+        QStringList models = m_provider->availableModels();
+        if (!models.isEmpty()) {
+            model = models.first();
+        } else {
+            return;
+        }
+    }
+
+    // Build a minimal request: system instruction + conversation messages (no system prompts)
+    std::vector<LLMMessage> messages;
+    LLMMessage sysMsg;
+    sysMsg.role = "system";
+    sysMsg.content = "Generate a concise title (max 20 characters) for this conversation. "
+                     "Return ONLY the title text, no quotes, no punctuation, no explanation.";
+    messages.push_back(sysMsg);
+
+    const ConversationThread &thread = m_threads[threadId];
+    for (const auto &msg : thread.messages) {
+        if (msg.role != "system") {
+            LLMMessage copy;
+            copy.role = msg.role;
+            copy.content = msg.content;
+            messages.push_back(copy);
+        }
+    }
+
+    std::vector<ToolDefinition> noTools;
+
+    // Use chatStream on the main thread with silent callbacks
+    // chat()/chatStream() use QNetworkAccessManager which needs the main thread's event loop
+    QPointer<AgentLoop> safeThis(this);
+    m_provider->chatStream(
+        messages,
+        noTools,
+        model,
+        [](const QString &) {},  // onChunk - discard silently
+        [safeThis, threadId](const LLMResponse &final) {  // onDone
+            if (safeThis && !final.content.isEmpty()) {
+                QString title = final.content.trimmed();
+                // Strip common wrapping characters
+                title.remove('"').remove('\'').remove('.');
+                if (title.length() > 20) {
+                    title = title.left(20);
+                }
+                if (!title.isEmpty()) {
+                    emit safeThis->titleGenerated(threadId, title);
+                }
+            }
+        },
+        [](const QString &) {}  // onError - silently ignore, tab keeps default title
+    );
+}
+
 
 void AgentLoop::showGhostText(const QString &suggestion, int line, int column)
 {

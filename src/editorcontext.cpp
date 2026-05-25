@@ -14,25 +14,45 @@ EditorContext::EditorContext()
 void EditorContext::capture(KTextEditor::MainWindow *mw)
 {
     if (!mw || !mw->activeView()) {
+        m_dirty = true;
         return;
     }
 
     auto *view = mw->activeView();
     auto *doc = view->document();
 
+    QString currentFilePath = doc->url().toLocalFile();
+    QString currentContent = doc->text();
+    QString contentHash = QString(QCryptographicHash::hash(currentContent.toUtf8(), QCryptographicHash::Md5).toHex());
+    auto cursor = view->cursorPosition();
+    int currentCursorLine = cursor.line();
+    int currentCursorColumn = cursor.column();
+    QString currentSelection = view->selectionText();
+
+    // Check if cache is still valid
+    bool needsRefresh = m_dirty ||
+                        currentFilePath != m_lastFilePath ||
+                        contentHash != m_lastContentHash ||
+                        qAbs(currentCursorLine - m_lastCursorLine) > 5 ||
+                        currentCursorColumn != m_lastCursorColumn ||
+                        currentSelection != m_lastSelection;
+
+    if (!needsRefresh) {
+        return; // Cache is still valid
+    }
+
     // File path
-    filePath = doc->url().toLocalFile();
+    filePath = currentFilePath;
 
     // File content (truncated to 2000 chars)
-    fileContent = truncate(doc->text(), 2000);
+    fileContent = truncate(currentContent, 2000);
 
     // Cursor position
-    auto cursor = view->cursorPosition();
-    cursorLine = cursor.line();
-    cursorColumn = cursor.column();
+    cursorLine = currentCursorLine;
+    cursorColumn = currentCursorColumn;
 
     // Selection (truncated to 1000 chars)
-    selection = truncate(view->selectionText(), 1000);
+    selection = truncate(currentSelection, 1000);
 
     // Open files list
     openFileList.clear();
@@ -45,6 +65,14 @@ void EditorContext::capture(KTextEditor::MainWindow *mw)
             }
         }
     }
+
+    // Update cache
+    m_dirty = false;
+    m_lastFilePath = currentFilePath;
+    m_lastContentHash = contentHash;
+    m_lastCursorLine = currentCursorLine;
+    m_lastCursorColumn = currentCursorColumn;
+    m_lastSelection = currentSelection;
 }
 
 QString EditorContext::toSystemPromptChunk() const

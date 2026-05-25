@@ -20,7 +20,8 @@ public:
     static QStringList listThreads();
     static QStringList listThreadsForProject(const QString &projectId);
     static QList<LLMMessage> loadThread(const QString &threadId);
-    static bool saveThread(const QString &threadId, const QList<LLMMessage> &messages, const QString &currentModel = QString());
+    static QString loadThreadTitle(const QString &threadId);
+    static bool saveThread(const QString &threadId, const QList<LLMMessage> &messages, const QString &currentModel = QString(), const QString &title = QString());
     static bool deleteThread(const QString &threadId);
 
 private:

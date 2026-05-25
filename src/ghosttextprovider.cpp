@@ -40,9 +40,19 @@ QSize GhostTextProvider::inlineNoteSize(const KTextEditor::InlineNote &note) con
 
     QFont font = note.font();
     QFontMetrics fm(font);
-    int width = fm.horizontalAdvance(m_ghostText);
-    int height = fm.height();
-    return {width, height};
+    
+    // Calculate size for multiline text
+    QStringList lines = m_ghostText.split('\n');
+    int maxWidth = 0;
+    for (const QString &line : lines) {
+        int lineWidth = fm.horizontalAdvance(line);
+        if (lineWidth > maxWidth) {
+            maxWidth = lineWidth;
+        }
+    }
+    
+    int height = fm.height() * lines.size();
+    return {maxWidth, height};
 }
 
 void GhostTextProvider::paintInlineNote(const KTextEditor::InlineNote &note, QPainter &painter,
@@ -59,7 +69,14 @@ void GhostTextProvider::paintInlineNote(const KTextEditor::InlineNote &note, QPa
     QColor ghostColor = Qt::gray;
     ghostColor.setAlpha(180);
     painter.setPen(ghostColor);
-    painter.drawText(0, 0, m_ghostText);
+    
+    // Support multiline text
+    QStringList lines = m_ghostText.split('\n');
+    int y = 0;
+    for (const QString &line : lines) {
+        painter.drawText(0, y, line);
+        y += painter.fontMetrics().height();
+    }
 }
 
 void GhostTextProvider::inlineNoteActivated(const KTextEditor::InlineNote &note,

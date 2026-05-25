@@ -74,6 +74,8 @@ set(PROJECT_SOURCES
     src/tools/findpathtool.h
     src/tools/listdirectorytool.h
     src/tools/createdirectorytool.h
+    src/tools/applydifftool.h
+    src/tools/applydifftool.cpp
     src/ui/agentconfigpage.h
     src/ui/agentconfigpage.cpp
     src/ui/agentpanel.h

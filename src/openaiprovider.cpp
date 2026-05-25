@@ -43,9 +43,8 @@ QStringList OpenAIProvider::availableModels()
         request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
     }
     
-    QNetworkAccessManager manager;
     QEventLoop loop;
-    QNetworkReply *reply = manager.get(request);
+    QNetworkReply *reply = m_nam->get(request);
     
     QObject::connect(reply, &QNetworkReply::finished, &loop, [&loop, &reply]() {
         reply->deleteLater();
@@ -130,8 +129,10 @@ QFuture<LLMResponse> OpenAIProvider::chat(
     QString jsonStr = QJsonDocument(json).toJson(QJsonDocument::Indented);
     
     QNetworkReply *reply = m_nam->post(request, QJsonDocument(json).toJson());
+    m_currentReply = reply;
     
-    QObject::connect(reply, &QNetworkReply::finished, [promise, reply]() {
+    QObject::connect(reply, &QNetworkReply::finished, [this, promise, reply]() {
+        m_currentReply = nullptr;
         
         if (reply->error() == QNetworkReply::NoError) {
 QByteArray responseData = reply->readAll();
@@ -235,8 +236,10 @@ void OpenAIProvider::chatStream(
     QByteArray payload = QJsonDocument(json).toJson();
     
     QNetworkReply *reply = m_nam->post(request, payload);
+    m_currentReply = reply;
     
-    QObject::connect(reply, &QNetworkReply::finished, [this, reply, onChunk, onDone, onError]() {
+    QObject::connect(reply, &QNetworkReply::finished, [this, reply, request, payload, onChunk, onDone, onError]() {
+        m_currentReply = nullptr;
         
         if (reply->error() == QNetworkReply::NoError) {
             QByteArray responseData = reply->readAll();
@@ -281,10 +284,80 @@ void OpenAIProvider::chatStream(
             response.content = responseText;
             onDone(response);
         } else {
+            int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            
+            // Check if we should retry (429 or 500 errors, max 3 retries)
+            bool shouldRetry = (statusCode == 429 || statusCode == 500) && m_retryCount < MAX_RETRIES;
+            
+            if (shouldRetry) {
+                m_retryCount++;
+                int delay = 2000 * m_retryCount;
+                
+                QNetworkRequest retryRequest = request;
+                QByteArray retryPayload = payload;
+                auto retryOnChunk = onChunk;
+                auto retryOnDone = onDone;
+                auto retryOnError = onError;
+                
+                QTimer::singleShot(delay, this, [this, retryRequest, retryPayload, retryOnChunk, retryOnDone, retryOnError]() {
+                    QNetworkReply *retryReply = m_nam->post(retryRequest, retryPayload);
+                    m_currentReply = retryReply;
+                    
+                    QObject::connect(retryReply, &QNetworkReply::finished, [this, retryReply, retryOnChunk, retryOnDone, retryOnError]() {
+                        m_currentReply = nullptr;
+                        m_retryCount = 0;
+                        if (retryReply->error() == QNetworkReply::NoError) {
+                            QByteArray responseData = retryReply->readAll();
+                            QString responseText;
+                            QList<QByteArray> lines = responseData.split('\n');
+                            for (const QByteArray &line : lines) {
+                                if (line.startsWith("data: ")) {
+                                    QByteArray jsonData = line.mid(6);
+                                    if (jsonData.trimmed() == "[DONE]") continue;
+                                    QJsonParseError parseError;
+                                    QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
+                                    if (parseError.error != QJsonParseError::NoError) continue;
+                                    QJsonObject root = doc.object();
+                                    if (root.contains("choices") && root["choices"].isArray()) {
+                                        QJsonArray choices = root["choices"].toArray();
+                                        if (!choices.isEmpty()) {
+                                            QJsonObject delta = choices.at(0).toObject()["delta"].toObject();
+                                            QString content = delta["content"].toString();
+                                            if (!content.isEmpty()) {
+                                                responseText += content;
+                                                if (retryOnChunk) retryOnChunk(content);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            LLMResponse response;
+                            response.content = responseText;
+                            retryOnDone(response);
+                        } else {
+                            retryOnError(retryReply->errorString());
+                        }
+                        retryReply->deleteLater();
+                    });
+                });
+                
+                reply->deleteLater();
+                return;
+            }
+            
+            m_retryCount = 0; // Reset on non-retryable error
             QString err = reply->errorString();
             QString errorWithUrl = QString("[%1] %2").arg(m_baseUrl).arg(err);
             onError(errorWithUrl);
         }
         reply->deleteLater();
     });
+}
+
+void OpenAIProvider::abort()
+{
+    if (m_currentReply) {
+        m_currentReply->abort();
+        m_currentReply = nullptr;
+    }
 }

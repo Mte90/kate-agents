@@ -21,7 +21,7 @@ ConfigManager::ConfigManager(QObject *parent)
     regolo.type = "openai-compatible";
     regolo.name = "regolo";
     regolo.baseUrl = "https://api.regolo.ai/v1";
-    regolo.apiKey = "sk--FuKaEKxbgKGwTfUBHf3PA";
+    regolo.apiKey = "";
     regolo.defaultModel = "qwen3-coder-next";
     regolo.enabled = true;
     providers.push_back(regolo);
@@ -62,6 +62,9 @@ void ConfigManager::load()
         m_temperature = obj["temperature"].toDouble(0.7);
         m_maxTokens = obj["maxTokens"].toInt(4096);
         m_systemPrompt = obj["systemPrompt"].toString(m_systemPrompt);
+        
+        // Load panel visibility state
+        m_panelVisible = obj["panelVisible"].toBool(false);
 
         m_providers.clear();
         QJsonArray providers = obj["providers"].toArray();
@@ -117,6 +120,7 @@ void ConfigManager::save()
     obj["temperature"] = m_temperature;
     obj["maxTokens"] = m_maxTokens;
     obj["systemPrompt"] = m_systemPrompt;
+    obj["panelVisible"] = m_panelVisible;
     
     QJsonArray providers;
     for (const ProviderConfig &p : m_providers) {
