@@ -42,6 +42,9 @@ public:
     
     signals:
     void settingsChanged();
+    
+public slots:
+    void savePanelState();
 
 private:
     LLMProvider *m_provider = nullptr;

@@ -78,13 +78,14 @@ public:
                 }
             }
             
-            // Save panel visibility state
-            m_plugin->config()->setPanelVisible(m_toolView->isVisible());
-            
             if (m_toolView->isVisible()) {
                 m_mainWindow->hideToolView(m_toolView);
+                m_plugin->config()->setPanelVisible(false);
+                m_plugin->config()->save();
             } else {
                 m_mainWindow->showToolView(m_toolView);
+                m_plugin->config()->setPanelVisible(true);
+                m_plugin->config()->save();
             }
         });
 
@@ -113,7 +114,12 @@ public:
                     layout->addWidget(m_panel, 1);
                 }
             }
-            m_mainWindow->showToolView(m_toolView);
+            
+            // Restore panel visibility state from config
+            bool shouldShow = m_plugin->config()->panelVisible();
+            if (shouldShow) {
+                m_mainWindow->showToolView(m_toolView);
+            }
         });
 
     }
@@ -121,6 +127,13 @@ public:
     ~AgentGuiClient() override {
         if (m_mainWindow) {
             m_mainWindow->guiFactory()->removeClient(this);
+        }
+        
+        // Save current panel visibility state before destruction
+        if (m_toolView && m_plugin && m_plugin->config()) {
+            bool isVisible = m_toolView->isVisible();
+            m_plugin->config()->setPanelVisible(isVisible);
+            m_plugin->config()->save();
         }
     }
     
@@ -175,6 +188,13 @@ KateAgentPlugin::~KateAgentPlugin()
         }
         m_agentLoop->saveAllThreads();
     }
+    
+    // Save panel visibility state - check actual visibility if toolView exists
+    if (m_config) {
+        // Note: We can't access m_guiClient here, so we rely on the state being saved
+        // whenever visibility changes via toggle action
+        m_config->save();
+    }
 }
 
 QObject *KateAgentPlugin::createView(KTextEditor::MainWindow *mw)
@@ -207,6 +227,15 @@ KTextEditor::ConfigPage *KateAgentPlugin::configPage(int number, QWidget *parent
     }
     Q_UNUSED(parent)
     return new AgentConfigPage(parent, this);
+}
+
+void KateAgentPlugin::savePanelState()
+{
+    // This slot can be called to save the current panel state
+    // The actual implementation is in AgentGuiClient destructor where m_toolView is accessible
+    if (m_config) {
+        m_config->save();
+    }
 }
 
 #include "kateagentplugin.moc"

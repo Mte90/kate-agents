@@ -125,6 +125,85 @@ void testPanelVisibleDeserialize()
     QCOMPARE(obj["bufferContextEnabled"].toBool(), true);
 }
 
+void testPanelVisibleToggleAndExit()
+{
+    // Simulate the full lifecycle:
+    // 1. User opens Kate (panelVisible = false by default)
+    // 2. User toggles panel ON (panelVisible = true, saved)
+    // 3. User toggles panel OFF (panelVisible = false, saved)
+    // 4. Kate closes (state saved again)
+    // 5. User opens Kate again (should read panelVisible = false)
+    
+    ConfigManager config(nullptr);
+    
+    // Step 1: Default state
+    QCOMPARE(config.panelVisible(), false);
+    
+    // Step 2: User toggles panel ON
+    config.setPanelVisible(true);
+    config.save();
+    QCOMPARE(config.panelVisible(), true);
+    
+    // Verify it was saved to file
+    QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QFile file(configPath + "/config.json");
+    QVERIFY(file.exists());
+    
+    file.open(QIODevice::ReadOnly);
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    QJsonObject obj = doc.object();
+    QCOMPARE(obj["panelVisible"].toBool(false), true);
+    file.close();
+    
+    // Step 3: User toggles panel OFF
+    config.setPanelVisible(false);
+    config.save();
+    QCOMPARE(config.panelVisible(), false);
+    
+    // Verify it was saved to file
+    file.open(QIODevice::ReadOnly);
+    doc = QJsonDocument::fromJson(file.readAll());
+    obj = doc.object();
+    QCOMPARE(obj["panelVisible"].toBool(true), false);
+    file.close();
+    
+    // Step 4 & 5: Simulate Kate restart by creating new ConfigManager
+    ConfigManager config2(nullptr);
+    QCOMPARE(config2.panelVisible(), false);
+}
+
+void testPanelVisibleExitWithoutToggle()
+{
+    // Simulate: User opens Kate, panel is shown by default (shouldShow = true from config)
+    // User does nothing, just closes Kate
+    // State should be saved as "visible" = true
+    
+    // Setup: Create config with panelVisible = true
+    ConfigManager config(nullptr);
+    config.setPanelVisible(true);
+    config.save();
+    
+    // Simulate exit: save current state (which is true)
+    bool currentState = config.panelVisible();
+    config.setPanelVisible(currentState);
+    config.save();
+    
+    // Verify state persisted
+    QCOMPARE(config.panelVisible(), true);
+    
+    QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QFile file(configPath + "/config.json");
+    file.open(QIODevice::ReadOnly);
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    QJsonObject obj = doc.object();
+    QCOMPARE(obj["panelVisible"].toBool(false), true);
+    file.close();
+    
+    // Simulate restart
+    ConfigManager config2(nullptr);
+    QCOMPARE(config2.panelVisible(), true);
+}
+
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
@@ -136,6 +215,8 @@ int main(int argc, char *argv[])
     testPanelVisibleJsonRoundtrip();
     testPanelVisibleWithOtherConfig();
     testPanelVisibleDeserialize();
+    testPanelVisibleToggleAndExit();
+    testPanelVisibleExitWithoutToggle();
     
     qDebug() << "\n=== All Panel Persistence Tests Complete ===";
     
