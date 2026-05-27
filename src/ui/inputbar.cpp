@@ -59,6 +59,7 @@ InputBar::InputBar(QWidget *parent)
     // Initialize FileMentionPopup
     m_filePopup = new FileMentionPopup(this);
     connect(m_filePopup, &FileMentionPopup::fileSelected, this, &InputBar::insertFilePath);
+    m_filePopup->setInputEdit(m_inputEdit);
     
     // Install event filter for Tab key handling
     m_inputEdit->installEventFilter(this);
@@ -257,8 +258,7 @@ void InputBar::onProfileChanged(int index)
 
 QSize InputBar::minimumSizeHint() const
 {
-    // Minimum height for single line + margins
-    int minHeight = m_inputEdit->fontMetrics().lineSpacing() + 20;
+    int minHeight = m_inputEdit->fontMetrics().lineSpacing() * 3 + 20;
     return QSize(0, minHeight);
 }
 

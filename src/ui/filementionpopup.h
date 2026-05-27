@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QKeyEvent>
+#include <QTextEdit>
 #include <QListView>
 #include <QStringListModel>
 #include <QDir>
@@ -19,6 +20,7 @@ public:
     void addTools(const QStringList &tools);
     void showAt(const QPoint &pos);
     void hidePopup();
+    void setInputEdit(QTextEdit *edit);
 
 signals:
     void fileSelected(const QString &filePath);
@@ -42,6 +44,7 @@ public:
     QStringList m_allPaths;
     QStringList m_filteredPaths;
     QStringList m_tools;
+    QTextEdit *m_inputEdit = nullptr;
 };
 
 #endif // FILEMENTIONPOPUP_H

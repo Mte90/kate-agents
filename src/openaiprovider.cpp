@@ -251,6 +251,7 @@ void OpenAIProvider::chatStream(
             
             // Parse SSE response line by line
             QString responseText;
+            QString reasoningText;
             QList<QByteArray> lines = responseData.split('\n');
             for (const QByteArray &line : lines) {
                 if (line.startsWith("data: ")) {
@@ -270,6 +271,10 @@ void OpenAIProvider::chatStream(
                             QJsonObject choice = choices.at(0).toObject();
                             QJsonObject delta = choice["delta"].toObject();
                             QString content = delta["content"].toString();
+                            QString reasoningContent = delta["reasoning_content"].toString();
+                            if (!reasoningContent.isEmpty()) {
+                                reasoningText += reasoningContent;
+                            }
                             if (!content.isEmpty()) {
                                 responseText += content;
                                 if (onChunk) {
@@ -281,6 +286,7 @@ void OpenAIProvider::chatStream(
                 }
             }
             LLMResponse response;
+            response.thinking = reasoningText;
             response.content = responseText;
             onDone(response);
         } else {
@@ -309,6 +315,7 @@ void OpenAIProvider::chatStream(
                         if (retryReply->error() == QNetworkReply::NoError) {
                             QByteArray responseData = retryReply->readAll();
                             QString responseText;
+                            QString thinkingText;
                             QList<QByteArray> lines = responseData.split('\n');
                             for (const QByteArray &line : lines) {
                                 if (line.startsWith("data: ")) {
@@ -323,6 +330,10 @@ void OpenAIProvider::chatStream(
                                         if (!choices.isEmpty()) {
                                             QJsonObject delta = choices.at(0).toObject()["delta"].toObject();
                                             QString content = delta["content"].toString();
+                                            QString reasoningContent = delta["reasoning_content"].toString();
+                                            if (!reasoningContent.isEmpty()) {
+                                                thinkingText += reasoningContent;
+                                            }
                                             if (!content.isEmpty()) {
                                                 responseText += content;
                                                 if (retryOnChunk) retryOnChunk(content);

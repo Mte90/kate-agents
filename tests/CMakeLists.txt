@@ -81,17 +81,20 @@ add_test(NAME test_chatuiflow COMMAND test_chatuiflow)
 #)
 #add_test(NAME test_agentprofile COMMAND test_agentprofile)
 
-## ThreadView test (disabled - private methods)
-#add_executable(test_threadview test_threadview.cpp
-#    ../src/ui/threadview.cpp
-#)
-#target_link_libraries(test_threadview
-#    Qt6::Test
-#    Qt6::Core
-#    Qt6::Widgets
-#    Qt6::Concurrent
-#)
-#add_test(NAME test_threadview COMMAND test_threadview)
+# ThreadView test (streaming, markdown, messaggi)
+add_executable(test_threadview test_threadview.cpp
+    ../src/ui/threadview.cpp
+    ../src/ui/syntaxhighlighter.cpp
+)
+set_target_properties(test_threadview PROPERTIES AUTOMOC ON)
+target_link_libraries(test_threadview
+    Qt6::Test
+    Qt6::Core
+    Qt6::Widgets
+    KF6::I18n
+)
+target_include_directories(test_threadview PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME test_threadview COMMAND test_threadview)
 
 # === New comprehensive tests ===
 

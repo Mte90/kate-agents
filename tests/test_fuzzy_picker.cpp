@@ -15,6 +15,7 @@
 #include <QTimer>
 #include <QSettings>
 #include <QDebug>
+#include <QScopedPointer>
 
 #include "ui/filementionpopup.h"
 
@@ -22,102 +23,101 @@ void testFuzzyPickerFocusPolicy()
 {
     qDebug() << "Test 1: FuzzyPicker Focus Policy";
     
-    FileMentionPopup popup(nullptr);
+    QWidget parent;
+    QTextEdit inputEdit(&parent);
+    FileMentionPopup popup(&inputEdit);
     popup.setupUI();
     
     // Verifica che il popup non rubi il focus
-    bool noFocus = (popup.focusPolicy() != Qt::StrongFocus);
+    bool noFocus = (popup->focusPolicy() != Qt::StrongFocus);
     qDebug() << "Popup has NoFocus/NoFocus/WeakFocus:" << noFocus;
     
-    QTEST_ASSERT(!noFocus || popup.focusPolicy() == Qt::StrongFocus);
+    QTEST_ASSERT(!noFocus || popup->focusPolicy() == Qt::StrongFocus);
 }
 
 void testFuzzyPickerFilter()
 {
     qDebug() << "Test 2: FuzzyPicker Filtering";
     
-    FileMentionPopup popup(nullptr);
+    QScopedPointer<FileMentionPopup> popup(new FileMentionPopup(nullptr));
     
     // Aggiungi file di prova
-    popup.m_allPaths << "main.cpp"
+    popup->m_allPaths << "main.cpp"
                      << "README.md"
                      << "agentloop.cpp"
                      << "test.cpp"
                      << "include/file.h";
     
-    popup.filterPaths("");
+    popup->filterPaths("");
     
     QTest::bench("Empty filter", 1);
-    QCOMPARE(popup.m_filteredPaths.count(), 5);
+    QCOMPARE(popup->m_filteredPaths.count(), 5);
     
     // Filtra per "a"
-    popup.filterPaths("a");
-    QCOMPARE(popup.m_filteredPaths.count(), 5); // Tutti contengono 'a'
+    popup->filterPaths("a");
+    QCOMPARE(popup->m_filteredPaths.count(), 5); // Tutti contengono 'a'
     
     // Filtra per "README"
-    popup.filterPaths("README");
-    QCOMPARE(popup.m_filteredPaths.count(), 1); // Solo README.md
+    popup->filterPaths("README");
+    QCOMPARE(popup->m_filteredPaths.count(), 1); // Solo README.md
     
-    QCOMPARE(popup.m_filteredPaths.first(), "README.md");
+    QCOMPARE(popup->m_filteredPaths.first(), "README.md");
 }
 
 void testFuzzyPickerKeyForward()
 {
-    qDebug() << "Test 3: Key Forwarding";
+    qDebug() << "Test 3: Key Forwarding via Popup";
     
-    QWidget *parent = new QWidget();
-    QTextEdit *inputEdit = new QTextEdit(parent);
-    inputEdit->setPlainText("test");
+    QWidget parent;
+    QTextEdit inputEdit(&parent);
+    inputEdit.setPlainText("test");
     
-    FileMentionPopup popup(inputEdit);
+    FileMentionPopup popup(&inputEdit);
     
-    // Simula tasto digitato 'a'
-    QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, Qt::Key_a, Qt::NoModifier, "a", false, 1);
+    QKeyEvent event(QEvent::KeyPress, Qt::Key_a, Qt::NoModifier, "a", false, 1);
+    QCoreApplication::sendEvent(&popup, &event);
     
-    // Il popup dovrebbe forwardare all'input edit
-    QCoreApplication::sendEvent(inputEdit, event);
-    
-    QString newContent = inputEdit->toPlainText();
-    QCOMPARE(newContent, "testa");
+    QCOMPARE(inputEdit.toPlainText(), QStringLiteral("testa"));
 }
 
 void testFuzzyPickerBackspace()
 {
-    qDebug() << "Test 4: Backspace Handling";
+    qDebug() << "Test 4: Backspace via Popup";
     
-    QWidget *parent = new QWidget();
-    QTextEdit *inputEdit = new QTextEdit(parent);
-    inputEdit->setPlainText("test");
+    QWidget parent;
+    QTextEdit inputEdit(&parent);
+    inputEdit.setPlainText("test");
+    QTextCursor cursor = inputEdit.textCursor();
+    cursor.movePosition(QTextCursor::End);
+    inputEdit.setTextCursor(cursor);
     
-    FileMentionPopup popup(inputEdit);
+    FileMentionPopup popup(&inputEdit);
     
-    // Simula Backspace
-    QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Back, Qt::NoModifier, "", false, 0);
+    QKeyEvent event(QEvent::KeyPress, Qt::Key_Backspace, Qt::NoModifier, QChar(0x0008), false, 1);
+    QCoreApplication::sendEvent(&popup, &event);
     
-    QCoreApplication::sendEvent(inputEdit, event);
-    
-    QCOMPARE(inputEdit->toPlainText(), "te");
+    QCOMPARE(inputEdit.toPlainText(), QStringLiteral("tes"));
 }
 
 void testFuzzyPickerEnterSelection()
 {
     qDebug() << "Test 5: Enter Key Selection";
     
-    QWidget *parent = new QWidget();
-    QTextEdit *inputEdit = new QTextEdit(parent);
-    inputEdit->setPlainText("test");
+    QWidget parent;
+    QTextEdit inputEdit(&parent);
+    inputEdit.setPlainText("test");
     
-    FileMentionPopup popup(inputEdit);
+    FileMentionPopup popup(&inputEdit);
     
     popup.m_allPaths << "file1.txt" << "file2.txt";
     popup.filterPaths("");
+    QCOMPARE(popup.m_filteredPaths.count(), 2);
     
-    // Seleziona primo elemento
-    popup.m_listView->setCurrentRow(0);
+    QModelIndex firstIdx = popup.m_listView->model()->index(0, 0);
+    popup.m_listView->selectionModel()->setCurrentIndex(firstIdx, QItemSelectionModel::SelectCurrent);
     
-    // Simula Enter
-    QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier, "\n", false, 1);
-    QCoreApplication::sendEvent(&popup, event);
+    QKeyEvent event(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier, "\n", false, 1);
+    QCoreApplication::sendEvent(&popup, &event);
     
     QCOMPARE(popup.m_filteredPaths.count(), 2); // Non altera filterPaths
 }
@@ -126,20 +126,17 @@ void testFuzzyPickerEscapeHide()
 {
     qDebug() << "Test 6: Escape Key Hide";
     
-    QWidget *parent = new QWidget();
-    QTextEdit *inputEdit = new QTextEdit(parent);
+    QWidget parent;
+    QTextEdit inputEdit(&parent);
     
-    FileMentionPopup popup(inputEdit);
+    FileMentionPopup popup(&inputEdit);
     popup.show();
-    
-    // Seleziona primo elemento
-    popup.m_listView->setCurrentRow(0);
     
     QTEST_ASSERT(popup.isVisible());
     
     // Simula Escape
-    QKeyEvent *event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier, "", false, 0);
-    QCoreApplication::sendEvent(&popup, event);
+    QKeyEvent event(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier, "", false, 0);
+    QCoreApplication::sendEvent(&popup, &event);
     
     QTEST_ASSERT(!popup.isVisible());
 }
@@ -148,15 +145,15 @@ void testFuzzyPickerShowAt()
 {
     qDebug() << "Test 7: ShowAt Position";
     
-    QWidget *parent = new QWidget();
-    QTextEdit *inputEdit = new QTextEdit(parent);
-    inputEdit->resize(400, 100);
+    QWidget parent;
+    QTextEdit inputEdit(&parent);
+    inputEdit.resize(400, 100);
     
-    FileMentionPopup popup(inputEdit);
+    FileMentionPopup popup(&inputEdit);
     popup.m_allPaths << "test.cpp";
     popup.filterPaths("");
     
-    QPoint globalPos = inputEdit->mapToGlobal(QPoint(0, inputEdit->height()));
+    QPoint globalPos = inputEdit.mapToGlobal(QPoint(0, inputEdit.height()));
     
     // Reset geometry per test
     popup.hide();

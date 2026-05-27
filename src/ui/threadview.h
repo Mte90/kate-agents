@@ -21,7 +21,7 @@ public:
     ~ThreadView() override;
 
     void appendUserMessage(const QString &message, const QString &profile = QString());
-    void appendAssistantMessage(const QString &message);
+    void appendAssistantMessage(const QString &message, const QString &thinking = QString());
     void appendToolCall(const QString &toolName, const QJsonObject &args);
     void appendToolResult(const QString &toolName, const QJsonObject &result);
     void showStreamingChunk(const QString &chunk);
@@ -55,7 +55,9 @@ private:
     QString escapeHtml(const QString &text) const;
     
     QString m_streamingContent;
+    QString m_streamingThinking;
     QString m_streamingModel;
+    int m_streamingStartPosition = 0;
     QTimer *m_cursorTimer = nullptr;
     int m_cursorBlinkCount = 0;
     

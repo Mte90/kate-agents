@@ -84,8 +84,8 @@ private slots:
     {
         QString threadId = QStringLiteral("roundtrip-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> messages;
-        messages.append({QStringLiteral("user"), QStringLiteral("Hello"), QString(), QString()});
-        messages.append({QStringLiteral("assistant"), QStringLiteral("Hi there!"), QString(), QString()});
+        messages.append({QStringLiteral("user"), QStringLiteral("Hello"), QString(), QString(), QString()});
+        messages.append({QStringLiteral("assistant"), QStringLiteral("Hi there!"), QString(), QString(), QString()});
 
         QVERIFY(ThreadJsonStorage::saveThread(threadId, messages));
 
@@ -112,8 +112,8 @@ private slots:
     {
         QString threadId = QStringLiteral("allfields-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> messages;
-        messages.append({QStringLiteral("user"), QStringLiteral("content"), QStringLiteral("Write"), QString()});
-        messages.append({QStringLiteral("tool"), QStringLiteral("result"), QString(), QStringLiteral("call_123")});
+        messages.append({QStringLiteral("user"), QStringLiteral("content"), QStringLiteral("Write"), QString(), QString()});
+        messages.append({QStringLiteral("tool"), QStringLiteral("result"), QString(), QStringLiteral("call_123"), QString()});
 
         QVERIFY(ThreadJsonStorage::saveThread(threadId, messages));
 
@@ -128,7 +128,7 @@ private slots:
         QString id1 = QStringLiteral("multi1-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QString id2 = QStringLiteral("multi2-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs;
-        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString()});
+        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
 
         QVERIFY(ThreadJsonStorage::saveThread(id1, msgs));
         QVERIFY(ThreadJsonStorage::saveThread(id2, msgs));
@@ -148,7 +148,7 @@ private slots:
     {
         QString threadId = QStringLiteral("title-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs;
-        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString()});
+        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
 
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs, QString(), "My Test Title"));
         QCOMPARE(ThreadJsonStorage::loadThreadTitle(threadId), QStringLiteral("My Test Title"));
@@ -158,7 +158,7 @@ private slots:
     {
         QString threadId = QStringLiteral("notitle-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs;
-        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString()});
+        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
 
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
         QVERIFY(ThreadJsonStorage::loadThreadTitle(threadId).isEmpty());
@@ -168,7 +168,7 @@ private slots:
     {
         QString threadId = QStringLiteral("del-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs;
-        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString()});
+        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
 
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
         QVERIFY(ThreadJsonStorage::deleteThread(threadId));
@@ -186,13 +186,13 @@ private slots:
     {
         QString threadId = QStringLiteral("delresave-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs1;
-        msgs1.append({QStringLiteral("user"), QStringLiteral("first"), QString(), QString()});
+        msgs1.append({QStringLiteral("user"), QStringLiteral("first"), QString(), QString(), QString()});
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs1));
 
         QVERIFY(ThreadJsonStorage::deleteThread(threadId));
 
         QList<LLMMessage> msgs2;
-        msgs2.append({QStringLiteral("user"), QStringLiteral("second"), QString(), QString()});
+        msgs2.append({QStringLiteral("user"), QStringLiteral("second"), QString(), QString(), QString()});
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs2));
 
         QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
@@ -204,11 +204,11 @@ private slots:
     {
         QString threadId = QStringLiteral("overwrite-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs1;
-        msgs1.append({QStringLiteral("user"), QStringLiteral("version1"), QString(), QString()});
+        msgs1.append({QStringLiteral("user"), QStringLiteral("version1"), QString(), QString(), QString()});
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs1));
 
         QList<LLMMessage> msgs2;
-        msgs2.append({QStringLiteral("user"), QStringLiteral("version2"), QString(), QString()});
+        msgs2.append({QStringLiteral("user"), QStringLiteral("version2"), QString(), QString(), QString()});
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs2));
 
         QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
@@ -269,7 +269,7 @@ private slots:
         QString threadIdA = QStringLiteral("thread-a-%1").arg(QDateTime::currentMSecsSinceEpoch());
 
         QList<LLMMessage> msgsA;
-        msgsA.append({QStringLiteral("user"), QStringLiteral("project A message"), QString(), QString()});
+        msgsA.append({QStringLiteral("user"), QStringLiteral("project A message"), QString(), QString(), QString()});
 
         ThreadJsonStorage::setCurrentProjectId(projA);
         QVERIFY(ThreadJsonStorage::saveThread(threadIdA, msgsA));
@@ -290,7 +290,7 @@ private slots:
     {
         QString threadId = QStringLiteral("large-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs;
-        msgs.append({QStringLiteral("user"), QString(50000, QChar('x')), QString(), QString()});
+        msgs.append({QStringLiteral("user"), QString(50000, QChar('x')), QString(), QString(), QString()});
 
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
 
@@ -303,7 +303,7 @@ private slots:
     {
         QString threadId = QStringLiteral("unicode-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs;
-        msgs.append({QStringLiteral("user"), QStringLiteral("こんにちは世界 🌍 Привет"), QString(), QString()});
+        msgs.append({QStringLiteral("user"), QStringLiteral("こんにちは世界 🌍 Привет"), QString(), QString(), QString()});
 
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
 
@@ -318,7 +318,7 @@ private slots:
 
         QString threadId = QStringLiteral("list-thread-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs;
-        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString()});
+        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
 
         QStringList threads = ThreadJsonStorage::listThreadsForProject(projId);
@@ -332,7 +332,7 @@ private slots:
     {
         QString threadId = QStringLiteral("model-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs;
-        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString()});
+        msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
 
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs, "gpt-4"));
 
@@ -345,8 +345,8 @@ private slots:
         QString threadId = QStringLiteral("many-msgs-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs;
         for (int i = 0; i < 100; ++i) {
-            msgs.append({QStringLiteral("user"), QStringLiteral("msg %1").arg(i), QString(), QString()});
-            msgs.append({QStringLiteral("assistant"), QStringLiteral("resp %1").arg(i), QString(), QString()});
+            msgs.append({QStringLiteral("user"), QStringLiteral("msg %1").arg(i), QString(), QString(), QString()});
+            msgs.append({QStringLiteral("assistant"), QStringLiteral("resp %1").arg(i), QString(), QString(), QString()});
         }
 
         QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));

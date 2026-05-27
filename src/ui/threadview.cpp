@@ -57,7 +57,7 @@ ThreadView::ThreadView(QWidget *parent)
     docSheet += ".copy-btn:hover { background-color: rgba(0,0,0,0.5); }\n";
     docSheet += ".copy-btn.copied { background-color: #10b981; }\n";
     docSheet += "a { color: " + pal.color(QPalette::Highlight).name() + "; text-decoration: underline; }\n";
-    docSheet += "hr { border: none; border-top: 1px solid " + pal.color(QPalette::Light).name() + "; margin: 20px 0 24px 0; opacity: 0.5; }\n";
+    docSheet += "hr { border: none; border-top: 1px solid " + pal.color(QPalette::Mid).name() + "; margin: 16px 0; opacity: 0.5; }\n";
     docSheet += ".model-label { color: " + pal.color(QPalette::Highlight).name() + "; font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 4px; }\n";
     docSheet += ".model-name { font-weight: bold; }\n";
     docSheet += ".cursor { animation: blink 1s step-end infinite; }\n";
@@ -139,20 +139,24 @@ void ThreadView::appendHtml(const QString &html)
 
 void ThreadView::appendUserMessage(const QString &message, const QString &profile)
 {
-    appendHtml("<hr>");
     QString header = i18n("User:");
     if (!profile.isEmpty()) {
         header += QString(" <span style='font-weight: normal; font-size: 0.85em; color: " + palette().color(QPalette::Mid).name() + ";'>[%1]</span>").arg(escapeHtml(profile));
     }
-    appendHtml(QString("<div class='user-message'><strong>%1</strong><br>%2</div>")
+    appendHtml(QString("<hr><div class='user-message'><strong>%1</strong><br>%2</div>")
                .arg(header, parseMarkdown(message)));
 }
 
-void ThreadView::appendAssistantMessage(const QString &message)
+void ThreadView::appendAssistantMessage(const QString &message, const QString &thinking)
 {
-    appendHtml("<hr>");
-    appendHtml(QString("<div class='assistant-message'>%1</div>")
-               .arg(parseMarkdown(message)));
+    QString content;
+    if (!thinking.isEmpty()) {
+        content += QString("<details><summary style='cursor:pointer;color:#888;font-size:0.85em;user-select:none;'>🤔 Thinking</summary><div style='background:rgba(0,0,0,0.05);padding:8px;border-radius:4px;margin:4px 0;font-size:0.9em;color:#888;font-style:italic;white-space:pre-wrap;'>%1</div></details><br>")
+                   .arg(escapeHtml(thinking));
+    }
+    
+    content += QString("<div class='assistant-message'>%1</div>").arg(parseMarkdown(message));
+    appendHtml("<hr>" + content);
 }
 
 void ThreadView::appendToolCall(const QString &toolName, const QJsonObject &args)
@@ -237,11 +241,10 @@ void ThreadView::showStreamingChunk(const QString &chunk)
             insertHtml(QString("<span style='font-weight: bold; font-size: 0.85em;'>%1</span><br>").arg(escapeHtml(m_streamingModel)));
         }
         insertHtml("<div style='white-space: pre-wrap; word-break: break-word;'>");
+        m_streamingStartPosition = textCursor().position();
     }
     
-    // Use insertText to preserve all whitespace exactly
-    // insertHtml collapses spaces across chunk boundaries in QTextDocument
-    cursor.insertText(chunk);
+    textCursor().insertText(chunk);
     
     insertHtml("<span class='cursor'>|</span>");
     scrollToBottom();
@@ -256,19 +259,26 @@ void ThreadView::endStreaming()
 {
     m_cursorTimer->stop();
     
-    // Remove the trailing cursor character from the rendered document
-    QTextCursor cursor = textCursor();
-    cursor.movePosition(QTextCursor::End, QTextCursor::MoveAnchor);
-    if (cursor.position() > 0) {
-        cursor.movePosition(QTextCursor::PreviousCharacter, QTextCursor::KeepAnchor);
+    QString streamingContent = m_streamingContent;
+    m_streamingContent.clear();
+    
+    if (!streamingContent.isEmpty() && m_streamingStartPosition > 0) {
+        QTextCursor cursor = textCursor();
+        cursor.movePosition(QTextCursor::End);
+        cursor.setPosition(m_streamingStartPosition);
+        cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
         cursor.removeSelectedText();
+        
+        QString markdownHtml = parseMarkdown(streamingContent);
+        insertHtml(markdownHtml);
+        insertHtml("</div><br>");
+    } else if (!streamingContent.isEmpty()) {
+        insertHtml(parseMarkdown(streamingContent));
+        insertHtml("<br>");
     }
     
-    cursor.movePosition(QTextCursor::End);
-    insertHtml("</div><br>");
     scrollToBottom();
-    
-    m_streamingContent.clear();
+    m_streamingStartPosition = 0;
 }
 
 void ThreadView::setStreamingModel(const QString &model)
@@ -320,7 +330,7 @@ void ThreadView::loadMessages(const QList<LLMMessage> &messages)
         if (msg.role == "user") {
             appendUserMessage(msg.content, msg.profile);
         } else if (msg.role == "assistant") {
-            appendAssistantMessage(msg.content);
+            appendAssistantMessage(msg.content, msg.thinking);
         }
     }
     

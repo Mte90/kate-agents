@@ -15,6 +15,7 @@ struct LLMMessage {
     QString content;
     QString profile;
     QString toolCallId;
+    QString thinking;
     
     LLMMessage() = default;
     LLMMessage(const LLMMessage&) = default;
@@ -38,6 +39,7 @@ struct ToolDefinition {
 
 struct LLMResponse {
     QString content;
+    QString thinking;
     QString finishReason;
     std::vector<ToolCall> toolCalls;
     int promptTokens = 0;

@@ -209,6 +209,7 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
                 LLMMessage assistantMsg;
                 assistantMsg.role = "assistant";
                 assistantMsg.content = final.content;
+                assistantMsg.thinking = final.thinking;
                 m_threads[threadId].messages.push_back(assistantMsg);
             }
             // Check for tool calls

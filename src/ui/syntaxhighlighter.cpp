@@ -134,8 +134,8 @@ QString SyntaxHighlighter::highlight(const QString &code, const QString &languag
         keywords = &commonKeywords;
     }
     
-    QStringList kwList = keywords->toList();
-    kwList.append(commonKeywords.toList());
+    QStringList kwList = keywords->values();
+    kwList.append(commonKeywords.values());
     kwList.removeDuplicates();
     QString kwPattern = "\\b(" + kwList.join("|") + ")\\b";
     QRegularExpression keywordRegex(kwPattern, QRegularExpression::CaseInsensitiveOption);
@@ -153,10 +153,6 @@ QString SyntaxHighlighter::highlight(const QString &code, const QString &languag
         QRegularExpressionMatchIterator it = token.pattern.globalMatch(result);
         while (it.hasNext()) {
             QRegularExpressionMatch match = it.next();
-            int start = match.capturedStart();
-            int len = match.capturedLength();
-            QString replacement = match.captured(0);
-            
             if (token.pattern.pattern() == getCommentPattern().pattern()) {
                 int commentStart = match.capturedStart(1);
                 int commentLen = match.capturedLength(1);

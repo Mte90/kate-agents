@@ -109,6 +109,7 @@ void FileMentionPopup::showAt(const QPoint &pos)
     }
 
     setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
+    setParent(nullptr);
     setGeometry(pos.x(), pos.y(), m_listView->width(), m_listView->height());
     show();
 }
@@ -116,7 +117,11 @@ void FileMentionPopup::showAt(const QPoint &pos)
 void FileMentionPopup::hidePopup()
 {
     QWidget::hide();
-    setParent(nullptr);
+}
+
+void FileMentionPopup::setInputEdit(QTextEdit *edit)
+{
+    m_inputEdit = edit;
 }
 
 void FileMentionPopup::setupUI()
@@ -218,11 +223,9 @@ void FileMentionPopup::keyPressEvent(QKeyEvent *event)
         return;
     }
     
-    if (parentWidget()) {
-        QWidget *inputEdit = parentWidget()->findChild<QTextEdit *>();
-        if (inputEdit) {
-            QKeyEvent *keyEvent = new QKeyEvent(QEvent::KeyPress, event->key(), event->modifiers(), event->text(), event->isAutoRepeat(), event->count());
-            QCoreApplication::postEvent(inputEdit, keyEvent);
-        }
+    
+    if (m_inputEdit) {
+        QKeyEvent keyEvent(QEvent::KeyPress, event->key(), event->modifiers(), event->text(), event->isAutoRepeat(), event->count());
+        QCoreApplication::sendEvent(m_inputEdit, &keyEvent);
     }
 }
