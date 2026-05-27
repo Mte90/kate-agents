@@ -2,9 +2,13 @@
 #define THREADVIEW_H
 
 #include <QTextBrowser>
+#include <QUrl>
 #include <QWidget>
 #include <QJsonObject>
 #include <QList>
+#include <QMap>
+
+#include "syntaxhighlighter.h"
 
 class LLMMessage;
 
@@ -34,21 +38,30 @@ public:
 protected:
     void showEvent(QShowEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
+    void setSource(const QUrl &name);
     
 signals:
     void linkClicked(const QString &url);
 private slots:
     void toggleCursor();
+    void onAnchorClicked(const QUrl &url);
 
 private:
+    static constexpr int MAX_VISIBLE_MESSAGES = 100;
+    
     bool m_cursorVisible = true;
-    QString parseMarkdown(const QString &text) const;
+    QList<LLMMessage> m_allMessages;
+    QString parseMarkdown(const QString &text);
     QString escapeHtml(const QString &text) const;
     
     QString m_streamingContent;
     QString m_streamingModel;
     QTimer *m_cursorTimer = nullptr;
     int m_cursorBlinkCount = 0;
+    
+    // Store code block content for copy functionality
+    QMap<QString, QString> m_codeBlocks;
+    int m_codeBlockCounter = 0;
 };
 
 #endif

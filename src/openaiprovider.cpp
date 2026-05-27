@@ -175,7 +175,7 @@ QByteArray responseData = reply->readAll();
             } else {
                 error = reply->errorString();
             }
-            qWarning() << "OpenAIProvider chat error:" << error;
+            // OpenAIProvider chat error: << error
             LLMResponse errResponse;
             errResponse.content = error;
             errResponse.finishReason = "error";

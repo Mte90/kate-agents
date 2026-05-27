@@ -37,7 +37,8 @@ public:
     void setRunningState(bool running);
     void setSystemPrompt(const QString &prompt);
     QString currentProfile() const { return m_profileCombo->currentText(); }
-    QSize minimumSizeHint() const override { return QSize(0, 0); }
+    QSize minimumSizeHint() const override;
+    QSize sizeHint() const override;
     void setAgentLoop(AgentLoop *agentLoop) { m_agentLoop = agentLoop; }
 
 signals:

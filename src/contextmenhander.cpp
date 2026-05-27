@@ -12,7 +12,7 @@ ContextMenuHandler::ContextMenuHandler(AgentLoop *agentLoop, QObject *parent)
 void ContextMenuHandler::installContextMenu(KTextEditor::View *view)
 {
     if (!view) {
-        qWarning() << "ContextMenuHandler: view is null";
+        // ContextMenuHandler: view is null
         return;
     }
 
@@ -22,7 +22,7 @@ void ContextMenuHandler::installContextMenu(KTextEditor::View *view)
 
     QMenu *menu = view->contextMenu();
     if (!menu) {
-        qWarning() << "ContextMenuHandler: context menu is null";
+        // ContextMenuHandler: context menu is null
         return;
     }
 
@@ -54,7 +54,7 @@ void ContextMenuHandler::uninstallContextMenu(KTextEditor::View *view)
 void ContextMenuHandler::onAskAgentAboutThis()
 {
     if (!m_agentLoop) {
-        qWarning() << "ContextMenuHandler: AgentLoop is null";
+        // ContextMenuHandler: AgentLoop is null
         return;
     }
 
@@ -65,13 +65,13 @@ void ContextMenuHandler::onAskAgentAboutThis()
 
     auto *view = qobject_cast<KTextEditor::View*>(action->parent());
     if (!view) {
-        qWarning() << "ContextMenuHandler: Could not get view from action";
+        // ContextMenuHandler: Could not get view from action
         return;
     }
 
     QString selectedText = view->selectionText();
     if (selectedText.isEmpty()) {
-        qWarning() << "ContextMenuHandler: No text selected";
+        // ContextMenuHandler: No text selected
         return;
     }
 
@@ -107,7 +107,7 @@ void ContextMenuHandler::onAskAgentAboutThis()
 
     QString threadId = m_agentLoop->currentThreadId();
     if (threadId.isEmpty()) {
-        qWarning() << "ContextMenuHandler: No active thread, cannot send message";
+        // ContextMenuHandler: No active thread, cannot send message
         return;
     }
     m_agentLoop->addUserMessage(threadId, message);

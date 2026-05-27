@@ -75,7 +75,6 @@ set(PROJECT_SOURCES
     src/tools/listdirectorytool.h
     src/tools/createdirectorytool.h
     src/tools/applydifftool.h
-    src/tools/applydifftool.cpp
     src/ui/agentconfigpage.h
     src/ui/agentconfigpage.cpp
     src/ui/agentpanel.h
@@ -86,6 +85,8 @@ set(PROJECT_SOURCES
     src/ui/inputbar.cpp
     src/ui/threadview.h
     src/ui/threadview.cpp
+    src/ui/syntaxhighlighter.h
+    src/ui/syntaxhighlighter.cpp
     src/ui/diffpreviewdialog.h
     src/ui/diffpreviewdialog.cpp
 )

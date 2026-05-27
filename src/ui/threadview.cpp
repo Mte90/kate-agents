@@ -1,5 +1,6 @@
 #include "threadview.h"
 #include "llmprovider.h"
+#include "syntaxhighlighter.h"
 #include <KLocalizedString>
 #include <QTextDocument>
 #include <QTextCursor>
@@ -8,6 +9,8 @@
 #include <QTimer>
 #include <QScrollBar>
 #include <QResizeEvent>
+#include <QClipboard>
+#include <QApplication>
 
 ThreadView::ThreadView(QWidget *parent)
     : QTextBrowser(parent)
@@ -23,6 +26,9 @@ ThreadView::ThreadView(QWidget *parent)
     setWordWrapMode(QTextOption::WordWrap);
     document()->setTextWidth(400);
 
+    // Handle anchor clicks for "show older messages" link
+    connect(this, &QTextBrowser::anchorClicked, this, &ThreadView::onAnchorClicked);
+    
     // Initialize cursor timer for streaming effect
     m_cursorTimer = new QTimer(this);
     m_cursorTimer->setInterval(500);
@@ -36,8 +42,8 @@ ThreadView::ThreadView(QWidget *parent)
     
     // Document-level stylesheet for HTML content
     QString docSheet;
-    docSheet += ".user-message { background-color: " + pal.color(QPalette::AlternateBase).lighter(110).name() + "; border-left: 3px solid " + pal.color(QPalette::Highlight).name() + "; border-radius: 6px; padding: 10px 12px; margin: 12px 0; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }\n";
-    docSheet += ".assistant-message { background-color: " + pal.color(QPalette::Base).lighter(105).name() + "; border-left: 3px solid " + pal.color(QPalette::Mid).name() + "; border-radius: 6px; padding: 10px 12px; margin: 12px 0; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }\n";
+    docSheet += ".user-message { background-color: " + pal.color(QPalette::AlternateBase).lighter(110).name() + "; border-left: 4px solid #3b82f6; border-radius: 6px; padding: 10px 12px; margin: 12px 0; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }\n";
+    docSheet += ".assistant-message { background-color: " + pal.color(QPalette::Base).lighter(105).name() + "; border-left: 4px solid #10b981; border-radius: 6px; padding: 10px 12px; margin: 12px 0; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }\n";
     docSheet += ".tool-call { background-color: " + pal.color(QPalette::Base).name() + "; border: 1px solid " + pal.color(QPalette::Midlight).name() + "; border-radius: 4px; padding: 6px 8px; margin: 6px 0; font-family: monospace; font-size: 0.9em; word-break: break-word; }\n";
     docSheet += ".tool-result { background-color: " + pal.color(QPalette::Base).name() + "; border: 1px solid " + pal.color(QPalette::Mid).name() + "; border-radius: 4px; padding: 6px 8px; margin: 6px 0; font-family: monospace; font-size: 0.9em; word-break: break-word; }\n";
     docSheet += ".tool-result.error { background-color: " + pal.color(QPalette::Base).lighter(108).name() + "; border: 1px solid " + pal.color(QPalette::Text).name() + "; }\n";
@@ -45,14 +51,25 @@ ThreadView::ThreadView(QWidget *parent)
     docSheet += ".terminal-header { background-color: " + pal.color(QPalette::Mid).name() + "; padding: 6px 8px; font-family: monospace; font-size: 0.9em; border-bottom: 1px solid " + pal.color(QPalette::Midlight).name() + "; }\n";
     docSheet += ".terminal-body { padding: 8px; font-family: monospace; font-size: 0.85em; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }\n";
     docSheet += "code { background-color: " + pal.color(QPalette::Base).lighter(105).name() + "; padding: 2px 4px; border-radius: 3px; font-family: monospace; font-size: 0.9em; }\n";
-    docSheet += "pre { background-color: " + pal.color(QPalette::Base).lighter(108).name() + "; padding: 8px; border-radius: 4px; overflow-x: auto; }\n";
+    docSheet += "pre { background-color: " + pal.color(QPalette::Base).lighter(108).name() + "; padding: 8px; border-radius: 4px; overflow-x: auto; position: relative; }\n";
     docSheet += "pre code { background-color: transparent; padding: 0; }\n";
+    docSheet += ".copy-btn { position: absolute; top: 4px; right: 4px; background-color: rgba(0,0,0,0.3); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8em; }\n";
+    docSheet += ".copy-btn:hover { background-color: rgba(0,0,0,0.5); }\n";
+    docSheet += ".copy-btn.copied { background-color: #10b981; }\n";
     docSheet += "a { color: " + pal.color(QPalette::Highlight).name() + "; text-decoration: underline; }\n";
-    docSheet += "hr { border: none; border-top: 1px solid " + pal.color(QPalette::Midlight).name() + "; margin: 20px 0 24px 0; }\n";
+    docSheet += "hr { border: none; border-top: 1px solid " + pal.color(QPalette::Light).name() + "; margin: 20px 0 24px 0; opacity: 0.5; }\n";
     docSheet += ".model-label { color: " + pal.color(QPalette::Highlight).name() + "; font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 4px; }\n";
     docSheet += ".model-name { font-weight: bold; }\n";
     docSheet += ".cursor { animation: blink 1s step-end infinite; }\n";
     docSheet += "@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }\n";
+    
+    // Syntax highlighting colors
+    docSheet += ".hl-keyword { color: #8959a8; font-weight: bold; }\n";
+    docSheet += ".hl-string { color: #718c00; }\n";
+    docSheet += ".hl-comment { color: #8e908c; font-style: italic; }\n";
+    docSheet += ".hl-number { color: #f5871f; }\n";
+    docSheet += ".hl-preproc { color: #da70d6; }\n";
+    
     document()->setDefaultStyleSheet(docSheet);
 }
 
@@ -69,12 +86,30 @@ QString ThreadView::escapeHtml(const QString &text) const
     return result;
 }
 
-QString ThreadView::parseMarkdown(const QString &text) const
+QString ThreadView::parseMarkdown(const QString &text)
 {
     QString result = escapeHtml(text);
     
-    result.replace(QRegularExpression("```(\\w*)\\n([\\s\\S]*?)```"), 
-                   "<pre><code>\\2</code></pre>");
+    QRegularExpression codeBlockRegex("```(\\w*)\\n([\\s\\S]*?)```");
+    QRegularExpressionMatch match;
+    int offset = 0;
+    
+    while ((match = codeBlockRegex.match(result, offset)).hasMatch()) {
+        QString language = match.captured(1);
+        QString code = match.captured(2);
+        
+        QString id = QString("code_%1").arg(++m_codeBlockCounter);
+        m_codeBlocks[id] = code;
+        
+        // Apply syntax highlighting
+        QString highlighted = SyntaxHighlighter::highlight(code, language);
+        
+        QString replacement = QString("<pre><a href='copy:%1' class='copy-btn'>Copy</a><code>%2</code></pre>")
+                              .arg(id, highlighted);
+        
+        result.replace(match.capturedStart(), match.capturedLength(), replacement);
+        offset = match.capturedStart() + replacement.length();
+    }
     
     result.replace(QRegularExpression("`([^`]+)`"), 
                    "<code>\\1</code>");
@@ -268,9 +303,20 @@ void ThreadView::toggleCursor()
 
 void ThreadView::loadMessages(const QList<LLMMessage> &messages)
 {
+    m_allMessages = messages;
     clear();
     
-    for (const auto &msg : messages) {
+    const bool truncated = m_allMessages.size() > MAX_VISIBLE_MESSAGES;
+    const int startIndex = truncated ? m_allMessages.size() - MAX_VISIBLE_MESSAGES : 0;
+    
+    if (truncated) {
+        const int older = m_allMessages.size() - MAX_VISIBLE_MESSAGES;
+        appendHtml(QString("<p style='font-style: italic; color: #666;'><a href='show-all'>%1</a></p>")
+                   .arg(i18np("Show %1 older message...", "Show %1 older messages...", older)));
+    }
+    
+    for (int i = startIndex; i < m_allMessages.size(); ++i) {
+        const auto &msg = m_allMessages[i];
         if (msg.role == "user") {
             appendUserMessage(msg.content, msg.profile);
         } else if (msg.role == "assistant") {
@@ -286,6 +332,28 @@ void ThreadView::loadMessages(const QList<LLMMessage> &messages)
 void ThreadView::renderThread(const QList<LLMMessage> &messages)
 {
     loadMessages(messages);
+}
+
+void ThreadView::setSource(const QUrl &name)
+{
+    if (name.toString() == "show-all") {
+        onAnchorClicked(name);
+        return;
+    }
+    QTextBrowser::setSource(name);
+}
+
+void ThreadView::onAnchorClicked(const QUrl &url)
+{
+    if (url.toString() == "show-all") {
+        loadMessages(m_allMessages);
+    } else if (url.toString().startsWith("copy:")) {
+        QString id = url.path().remove(0, 1); // Remove leading '/'
+        if (m_codeBlocks.contains(id)) {
+            QClipboard *clipboard = QApplication::clipboard();
+            clipboard->setText(m_codeBlocks[id]);
+        }
+    }
 }
 
 void ThreadView::showEvent(QShowEvent *event)

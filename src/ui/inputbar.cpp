@@ -6,6 +6,7 @@
 #include <QKeyEvent>
 #include <QDir>
 #include <QMetaEnum>
+#include <QAbstractTextDocumentLayout>
 
 InputBar::InputBar(QWidget *parent)
     : QWidget(parent)
@@ -22,7 +23,6 @@ InputBar::InputBar(QWidget *parent)
     m_inputEdit->setAcceptRichText(false);
     m_inputEdit->setMinimumWidth(0);
     m_inputEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    m_inputEdit->setMinimumHeight(60);
     connect(m_inputEdit, &QTextEdit::textChanged, this, &InputBar::onTextChanged);
     mainLayout->addWidget(m_inputEdit, 1);
     
@@ -253,6 +253,29 @@ void InputBar::onProfileChanged(int index)
     QString prompt = systemPromptForProfile(profileEnum);
     m_systemPrompt = prompt;
     emit systemPromptChanged(m_systemPrompt);
+}
+
+QSize InputBar::minimumSizeHint() const
+{
+    // Minimum height for single line + margins
+    int minHeight = m_inputEdit->fontMetrics().lineSpacing() + 20;
+    return QSize(0, minHeight);
+}
+
+QSize InputBar::sizeHint() const
+{
+    // Calculate optimal height based on text content
+    int contentHeight = m_inputEdit->document()->documentLayout()->documentSize().height();
+    int marginsAndBottomRow = 40; // top+bottom margins + bottom row height
+    int totalHeight = contentHeight + marginsAndBottomRow;
+    
+    // Cap at reasonable max height (200px)
+    int maxHeight = 200;
+    if (totalHeight > maxHeight) {
+        totalHeight = maxHeight;
+    }
+    
+    return QSize(0, totalHeight);
 }
 
 bool InputBar::eventFilter(QObject *obj, QEvent *event)

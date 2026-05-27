@@ -116,7 +116,7 @@ void AgentPanel::setupUi()
 void AgentPanel::connectSignals()
 {
     if (!m_inputBar || !m_tabs) {
-        qWarning() << "AgentPanel: Cannot connect signals - m_inputBar or m_tabs is null";
+        // AgentPanel: Cannot connect signals - m_inputBar or m_tabs is null
         return;
     }
     
@@ -137,7 +137,7 @@ void AgentPanel::connectSignals()
     connect(m_agent, &AgentLoop::threadUpdated, this, &AgentPanel::onThreadUpdated);
     connect(m_agent, &AgentLoop::titleGenerated, this, &AgentPanel::onTitleGenerated);
     } else {
-        qWarning() << "AgentPanel: m_agent is NULL - cannot connect AgentLoop signals";
+        // AgentPanel: m_agent is NULL - cannot connect AgentLoop signals
     }
     
     if (m_permissions) {
@@ -367,7 +367,7 @@ void AgentPanel::onSendMessage(const QString &message)
 {
     // Re-entrancy guard: prevent sending while agent is running
     if (m_agent && m_agent->isRunning()) {
-        qWarning() << "Agent is already running, ignoring send request";
+        // Agent is already running, ignoring send request
         return;
     }
     

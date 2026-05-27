@@ -69,7 +69,7 @@ static QJsonObject loadThreadsFile(const QString &projectId)
     }
     
     if (!file.open(QIODevice::ReadOnly)) {
-        qWarning() << "Failed to open threads file for reading:" << filePath;
+        // Failed to open threads file for reading: << filePath
         return QJsonObject();
     }
     
@@ -94,7 +94,7 @@ static bool saveThreadsFile(const QString &projectId, const QJsonObject &data)
     QFile file(filePath);
     
     if (!file.open(QIODevice::WriteOnly)) {
-        qWarning() << "ThreadJsonStorage::saveThreadsFile - Failed to open threads file for writing:" << filePath;
+        // ThreadJsonStorage::saveThreadsFile - Failed to open threads file for writing: << filePath
         return false;
     }
     
@@ -249,14 +249,14 @@ bool ThreadJsonStorage::deleteThread(const QString &threadId)
     
     
     if (!root.contains(threadsKey) || !root[threadsKey].isObject()) {
-        qWarning() << "ThreadJsonStorage::deleteThread - threads key not found or not an object";
+        // ThreadJsonStorage::deleteThread - threads key not found or not an object
         return false;
     }
     
     QJsonObject threadsObj = root[threadsKey].toObject();
     
     if (!threadsObj.contains(threadId)) {
-        qWarning() << "ThreadJsonStorage::deleteThread - threadId not found in storage";
+        // ThreadJsonStorage::deleteThread - threadId not found in storage
         return false;
     }
     
