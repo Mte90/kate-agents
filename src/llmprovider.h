@@ -20,7 +20,10 @@ struct LLMMessage {
     LLMMessage() = default;
     LLMMessage(const LLMMessage&) = default;
     LLMMessage& operator=(const LLMMessage&) = default;
+    ~LLMMessage() noexcept {}
 };
+
+Q_DECLARE_TYPEINFO(LLMMessage, Q_RELOCATABLE_TYPE);
 
 struct ToolCall {
     QString id;

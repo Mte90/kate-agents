@@ -19,8 +19,8 @@ private slots:
     {
         QString threadId = "test-thread-" + QString::number(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> messages;
-        messages.append(LLMMessage{"user", "Hello", "", ""});
-        messages.append(LLMMessage{"assistant", "Hi there!", "", ""});
+        messages.append(LLMMessage{"user", "Hello", "", "", ""});
+        messages.append(LLMMessage{"assistant", "Hi there!", "", "", ""});
         
         bool saved = ThreadJsonStorage::saveThread(threadId, messages);
         QVERIFY(saved);
@@ -35,7 +35,7 @@ private slots:
     {
         QString threadId = "test-delete-" + QString::number(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> messages;
-        messages.append(LLMMessage{"user", "Test", "", ""});
+        messages.append(LLMMessage{"user", "Test", "", "", ""});
         
         bool saved = ThreadJsonStorage::saveThread(threadId, messages);
         QVERIFY(saved);
@@ -48,7 +48,7 @@ private slots:
     {
         QString threadId = "test-list-" + QString::number(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> messages;
-        messages.append(LLMMessage{"user", "Test", "", ""});
+        messages.append(LLMMessage{"user", "Test", "", "", ""});
         
         bool saved = ThreadJsonStorage::saveThread(threadId, messages);
         QVERIFY(saved);

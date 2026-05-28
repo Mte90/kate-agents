@@ -167,6 +167,7 @@ QList<LLMMessage> ThreadJsonStorage::loadThread(const QString &threadId)
         msg.role = msgObj["role"].toString();
         msg.content = msgObj["content"].toString();
         msg.profile = msgObj["profile"].toString();
+        msg.thinking = msgObj["thinking"].toString();
         msg.toolCallId = msgObj["toolCallId"].toString();
         
         messages.append(msg);
@@ -216,6 +217,7 @@ bool ThreadJsonStorage::saveThread(const QString &threadId, const QList<LLMMessa
         msgObj["role"] = msg.role;
         msgObj["content"] = msg.content;
         msgObj["profile"] = msg.profile;
+        msgObj["thinking"] = msg.thinking;
         msgObj["toolCallId"] = msg.toolCallId;
         
         messagesArray.append(msgObj);
@@ -247,26 +249,65 @@ bool ThreadJsonStorage::deleteThread(const QString &threadId)
     QString prefix = getProjectPrefix(projectId);
     QString threadsKey = prefix + "threads";
     
-    
-    if (!root.contains(threadsKey) || !root[threadsKey].isObject()) {
-        // ThreadJsonStorage::deleteThread - threads key not found or not an object
-        return false;
+    bool foundInCurrentFile = false;
+    if (root.contains(threadsKey) && root[threadsKey].isObject()) {
+        QJsonObject threadsObj = root[threadsKey].toObject();
+        if (threadsObj.contains(threadId)) {
+            threadsObj.remove(threadId);
+            root[threadsKey] = threadsObj;
+            foundInCurrentFile = true;
+        }
     }
     
-    QJsonObject threadsObj = root[threadsKey].toObject();
-    
-    if (!threadsObj.contains(threadId)) {
-        // ThreadJsonStorage::deleteThread - threadId not found in storage
-        return false;
+    if (foundInCurrentFile) {
+        return saveThreadsFile(projectId, root);
     }
     
-    threadsObj.remove(threadId);
-    root[threadsKey] = threadsObj;
+    QString threadDir = getThreadDir();
+    QDir dir(threadDir);
+    QStringList filters;
+    filters << "*_threads.json";
+    QStringList files = dir.entryList(filters, QDir::Files);
     
+    for (const QString &file : files) {
+        QString filePath = dir.absoluteFilePath(file);
+        QFile jsonFile(filePath);
+        if (!jsonFile.open(QIODevice::ReadOnly)) {
+            continue;
+        }
+        
+        QByteArray data = jsonFile.readAll();
+        jsonFile.close();
+        
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        if (doc.isNull() || !doc.isObject()) {
+            continue;
+        }
+        
+        QJsonObject fileRoot = doc.object();
+        for (auto it = fileRoot.begin(); it != fileRoot.end(); ++it) {
+            if (!it.key().endsWith("threads") || !it.value().isObject()) {
+                continue;
+            }
+            
+            QJsonObject threadsObj = it.value().toObject();
+            if (threadsObj.contains(threadId)) {
+                threadsObj.remove(threadId);
+                fileRoot[it.key()] = threadsObj;
+                
+                QFile writeFile(filePath);
+                if (!writeFile.open(QIODevice::WriteOnly)) {
+                    return false;
+                }
+                QJsonDocument saveDoc(fileRoot);
+                writeFile.write(saveDoc.toJson(QJsonDocument::Indented));
+                writeFile.close();
+                return true;
+            }
+        }
+    }
     
-    bool saved = saveThreadsFile(projectId, root);
-    
-    return saved;
+    return false;
 }
 
 QString ThreadJsonStorage::detectGitRepoRoot()

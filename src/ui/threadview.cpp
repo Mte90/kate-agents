@@ -56,6 +56,13 @@ ThreadView::ThreadView(QWidget *parent)
     docSheet += ".copy-btn { position: absolute; top: 4px; right: 4px; background-color: rgba(0,0,0,0.3); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8em; }\n";
     docSheet += ".copy-btn:hover { background-color: rgba(0,0,0,0.5); }\n";
     docSheet += ".copy-btn.copied { background-color: #10b981; }\n";
+    docSheet += "h1, h2, h3, h4, h5, h6 { margin: 12px 0 8px 0; font-weight: bold; }\n";
+    docSheet += "h1 { font-size: 1.3em; }\n";
+    docSheet += "h2 { font-size: 1.15em; }\n";
+    docSheet += "h3 { font-size: 1.05em; }\n";
+    docSheet += "h4 { font-size: 1em; }\n";
+    docSheet += "h5 { font-size: 0.95em; }\n";
+    docSheet += "h6 { font-size: 0.9em; }\n";
     docSheet += "a { color: " + pal.color(QPalette::Highlight).name() + "; text-decoration: underline; }\n";
     docSheet += "hr { border: none; border-top: 1px solid " + pal.color(QPalette::Mid).name() + "; margin: 16px 0; opacity: 0.5; }\n";
     docSheet += ".model-label { color: " + pal.color(QPalette::Highlight).name() + "; font-size: 0.85em; font-weight: bold; display: block; margin-bottom: 4px; }\n";
@@ -88,11 +95,22 @@ QString ThreadView::escapeHtml(const QString &text) const
 
 QString ThreadView::parseMarkdown(const QString &text)
 {
-    QString result = escapeHtml(text);
+    // Step 1: Process code blocks BEFORE HTML escaping (SyntaxHighlighter handles its own escaping)
+    // Use placeholder markers to avoid double-escaping the code block HTML
+    QString result = text;
     
     QRegularExpression codeBlockRegex("```(\\w*)\\n([\\s\\S]*?)```");
     QRegularExpressionMatch match;
     int offset = 0;
+    
+    // Collect code block replacements (process right-to-left to preserve positions)
+    struct CodeBlockReplacement {
+        qsizetype position;
+        qsizetype length;
+        QString placeholder;
+        QString codeId;
+    };
+    QList<CodeBlockReplacement> blocks;
     
     while ((match = codeBlockRegex.match(result, offset)).hasMatch()) {
         QString language = match.captured(1);
@@ -101,16 +119,36 @@ QString ThreadView::parseMarkdown(const QString &text)
         QString id = QString("code_%1").arg(++m_codeBlockCounter);
         m_codeBlocks[id] = code;
         
-        // Apply syntax highlighting
         QString highlighted = SyntaxHighlighter::highlight(code, language);
         
-        QString replacement = QString("<pre><a href='copy:%1' class='copy-btn'>Copy</a><code>%2</code></pre>")
-                              .arg(id, highlighted);
+        QString html = QString("<pre><a href='copy:%1' class='copy-btn'>Copy</a><code>%2</code></pre>")
+                       .arg(id, highlighted);
         
-        result.replace(match.capturedStart(), match.capturedLength(), replacement);
-        offset = match.capturedStart() + replacement.length();
+        QString placeholder = QString("\x01CODEBLOCK_%1\x01").arg(m_codeBlockCounter);
+        blocks.prepend({match.capturedStart(), match.capturedLength(), placeholder, id});
+        m_codeBlockHtml[id] = html;
+        offset = match.capturedEnd();
     }
     
+    for (const auto &block : blocks) {
+        result.replace(block.position, block.length, block.placeholder);
+    }
+    
+    result = escapeHtml(result);
+    
+    // Headers before code block restoration to avoid matching # inside code blocks
+    result.replace(QRegularExpression("^######\\s+(.+)$", QRegularExpression::MultilineOption), "<h6>\\1</h6>");
+    result.replace(QRegularExpression("^#####\\s+(.+)$", QRegularExpression::MultilineOption), "<h5>\\1</h5>");
+    result.replace(QRegularExpression("^####\\s+(.+)$", QRegularExpression::MultilineOption), "<h4>\\1</h4>");
+    result.replace(QRegularExpression("^###\\s+(.+)$", QRegularExpression::MultilineOption), "<h3>\\1</h3>");
+    result.replace(QRegularExpression("^##\\s+(.+)$", QRegularExpression::MultilineOption), "<h2>\\1</h2>");
+    result.replace(QRegularExpression("^#\\s+(.+)$", QRegularExpression::MultilineOption), "<h1>\\1</h1>");
+    
+    for (const auto &block : blocks) {
+        result.replace(escapeHtml(block.placeholder), m_codeBlockHtml[block.codeId]);
+    }
+    
+    // Step 5: Process remaining inline markdown
     result.replace(QRegularExpression("`([^`]+)`"), 
                    "<code>\\1</code>");
     
@@ -141,7 +179,7 @@ void ThreadView::appendUserMessage(const QString &message, const QString &profil
 {
     QString header = i18n("User:");
     if (!profile.isEmpty()) {
-        header += QString(" <span style='font-weight: normal; font-size: 0.85em; color: " + palette().color(QPalette::Mid).name() + ";'>[%1]</span>").arg(escapeHtml(profile));
+        header += QString(" <span style='font-weight: normal; font-size: 0.85em; color: " + palette().color(QPalette::Highlight).name() + ";'>[%1]</span>").arg(escapeHtml(profile));
     }
     appendHtml(QString("<hr><div class='user-message'><strong>%1</strong><br>%2</div>")
                .arg(header, parseMarkdown(message)));
@@ -346,7 +384,8 @@ void ThreadView::renderThread(const QList<LLMMessage> &messages)
 
 void ThreadView::setSource(const QUrl &name)
 {
-    if (name.toString() == "show-all") {
+    QString urlStr = name.toString();
+    if (urlStr == "show-all" || urlStr.startsWith("copy:")) {
         onAnchorClicked(name);
         return;
     }
@@ -358,7 +397,7 @@ void ThreadView::onAnchorClicked(const QUrl &url)
     if (url.toString() == "show-all") {
         loadMessages(m_allMessages);
     } else if (url.toString().startsWith("copy:")) {
-        QString id = url.path().remove(0, 1); // Remove leading '/'
+        QString id = url.toString().mid(5); // Remove "copy:" prefix
         if (m_codeBlocks.contains(id)) {
             QClipboard *clipboard = QApplication::clipboard();
             clipboard->setText(m_codeBlocks[id]);

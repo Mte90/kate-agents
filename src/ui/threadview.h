@@ -63,6 +63,7 @@ private:
     
     // Store code block content for copy functionality
     QMap<QString, QString> m_codeBlocks;
+    QMap<QString, QString> m_codeBlockHtml;
     int m_codeBlockCounter = 0;
 };
 

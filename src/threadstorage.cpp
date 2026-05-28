@@ -103,6 +103,8 @@ bool ThreadStorage::saveThread(const ConversationThread &thread)
         LLMMessage lmMsg;
         lmMsg.role = msg.role;
         lmMsg.content = msg.content;
+        lmMsg.profile = msg.profile;
+        lmMsg.thinking = msg.thinking;
         lmMsg.toolCallId = msg.toolCallId;
         messages.append(lmMsg);
     }

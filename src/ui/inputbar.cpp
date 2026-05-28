@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QMetaEnum>
 #include <QAbstractTextDocumentLayout>
+#include <QProcess>
 
 InputBar::InputBar(QWidget *parent)
     : QWidget(parent)
@@ -131,7 +132,25 @@ void InputBar::showAutocompletePopup(int atIndex)
     QDir projectDir = QDir::current();
     if (projectDir.exists()) {
         QStringList files;
-        findFilesRecursive(projectDir, "", files, 2);
+        QProcess gitProcess;
+        gitProcess.setWorkingDirectory(projectDir.absolutePath());
+        
+        gitProcess.start(QStringLiteral("git"), {QStringLiteral("ls-files"), QStringLiteral("--cached"), QStringLiteral("--others"), QStringLiteral("--exclude-standard")});
+        if (gitProcess.waitForFinished(3000) && gitProcess.exitCode() == 0) {
+            QString output = QString::fromUtf8(gitProcess.readAllStandardOutput());
+            QStringList gitFiles = output.split(QChar('\n'), Qt::SkipEmptyParts);
+            gitFiles.sort();
+            for (const QString &gf : gitFiles) {
+                if (!gf.startsWith(QChar('.'))) {
+                    files.append(gf);
+                }
+            }
+        } else {
+            findFilesRecursive(projectDir, QString(), files, 2);
+        }
+        if (files.count() > 200) {
+            files = files.mid(0, 200);
+        }
         items.append(files);
     }
     
@@ -258,23 +277,23 @@ void InputBar::onProfileChanged(int index)
 
 QSize InputBar::minimumSizeHint() const
 {
-    int minHeight = m_inputEdit->fontMetrics().lineSpacing() * 3 + 20;
-    return QSize(0, minHeight);
+    int editMinHeight = m_inputEdit->fontMetrics().lineSpacing() * 3;
+    int bottomRowAndMargins = 55;
+    return QSize(0, editMinHeight + bottomRowAndMargins);
 }
 
 QSize InputBar::sizeHint() const
 {
-    // Calculate optimal height based on text content
     int contentHeight = m_inputEdit->document()->documentLayout()->documentSize().height();
-    int marginsAndBottomRow = 40; // top+bottom margins + bottom row height
-    int totalHeight = contentHeight + marginsAndBottomRow;
-    
-    // Cap at reasonable max height (200px)
-    int maxHeight = 200;
-    if (totalHeight > maxHeight) {
-        totalHeight = maxHeight;
+    int bottomRowAndMargins = 55;
+    int totalHeight = contentHeight + bottomRowAndMargins;
+    if (totalHeight > 250) {
+        totalHeight = 250;
     }
-    
+    QSize min = minimumSizeHint();
+    if (totalHeight < min.height()) {
+        totalHeight = min.height();
+    }
     return QSize(0, totalHeight);
 }
 

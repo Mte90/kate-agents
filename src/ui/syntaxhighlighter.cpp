@@ -71,10 +71,13 @@ static const QSet<QString> commonKeywords = {
     "const", "static", "extern", "inline", "virtual", "override", "final",
     "private", "protected", "public", "namespace", "using", "typedef", "struct",
     "enum", "union", "class", "interface", "implements", "extends", "import",
-    "export", "module", "package"
+    "export", "module", "package",
+    "if", "else", "for", "while", "do", "switch", "case", "break", "continue",
+    "return", "try", "catch", "throw", "new", "delete", "sizeof", "this",
+    "true", "false", "NULL", "nullptr", "typename", "operator"
 };
 
-static const QRegularExpression commentPattern("(//|#|/\\*|\\b--)[^\\n]*");
+static const QRegularExpression commentPattern("(//|(?!#\\w)#[^\\n]*|/\\*|\\b--)[^\\n]*");
 static const QRegularExpression stringPattern("(\"\"\"[\\s\\S]*?\"\"\"|'''[\\s\\S]*?'''|\"[^\"]*\"|'[^']*'|`[^`]*`)");
 static const QRegularExpression numberPattern("\\b\\d+\\.?\\d*([eE][+-]?\\d+)?\\b");
 static const QRegularExpression preprocessorPattern("#\\w+[^\\n]*");
@@ -97,20 +100,21 @@ void SyntaxHighlighter::escapeHtml(QString &text)
     text.replace("&", "&amp;");
     text.replace("<", "&lt;");
     text.replace(">", "&gt;");
-    text.replace("\"", "&quot;");
+    // Don't escape " or ' — they are needed for string/regex pattern matching
+    // and are safe in text content (only dangerous in HTML attribute values)
 }
+
+struct HighlightMatch {
+    int start;
+    int length;
+    int priority; // lower = higher priority (processed first)
+    QString cssClass;
+};
 
 QString SyntaxHighlighter::highlight(const QString &code, const QString &language)
 {
     QString result = code;
     escapeHtml(result);
-    
-    // Define token types and their HTML spans
-    struct Token {
-        QRegularExpression pattern;
-        QString htmlSpan;
-        int priority; // Lower = processed first
-    };
     
     // Get keywords for the language
     const QSet<QString> *keywords = nullptr;
@@ -140,56 +144,70 @@ QString SyntaxHighlighter::highlight(const QString &code, const QString &languag
     QString kwPattern = "\\b(" + kwList.join("|") + ")\\b";
     QRegularExpression keywordRegex(kwPattern, QRegularExpression::CaseInsensitiveOption);
     
-    QList<Token> tokens;
-    tokens.append({getCommentPattern(), "<span class='hl-comment'>\\1</span>", 1});
-    tokens.append({getStringPattern(), "<span class='hl-string'>\\1</span>", 2});
-    tokens.append({keywordRegex, "<span class='hl-keyword'>\\1</span>", 3});
-    tokens.append({numberPattern, "<span class='hl-number'>\\1</span>", 4});
-    tokens.append({getPreprocessorPattern(), "<span class='hl-preproc'>\\1</span>", 5});
+    // Define highlighting rules with priority (lower = higher priority)
+    // Comments and strings have highest priority so keywords/numbers inside them are not matched
+    struct Rule {
+        QRegularExpression regex;
+        QString cssClass;
+        int priority;
+    };
     
-    QMultiMap<int, QString> marked;
+    QList<Rule> rules;
+    rules.append({getCommentPattern(), QStringLiteral("hl-comment"), 1});
+    rules.append({getStringPattern(), QStringLiteral("hl-string"), 1});
+    rules.append({getPreprocessorPattern(), QStringLiteral("hl-preproc"), 2});
+    rules.append({keywordRegex, QStringLiteral("hl-keyword"), 3});
+    rules.append({numberPattern, QStringLiteral("hl-number"), 3});
     
-    for (const Token &token : tokens) {
-        QRegularExpressionMatchIterator it = token.pattern.globalMatch(result);
+    // Step 1: Collect ALL matches on the ORIGINAL escaped string (before any span insertion)
+    // This prevents the in-place modification bug and the keyword-in-HTML-attribute bug
+    QList<HighlightMatch> allMatches;
+    
+    for (const Rule &rule : rules) {
+        QRegularExpressionMatchIterator it = rule.regex.globalMatch(result);
         while (it.hasNext()) {
             QRegularExpressionMatch match = it.next();
-            if (token.pattern.pattern() == getCommentPattern().pattern()) {
-                int commentStart = match.capturedStart(1);
-                int commentLen = match.capturedLength(1);
-                QString before = result.mid(0, commentStart);
-                QString comment = result.mid(commentStart, commentLen);
-                QString after = result.mid(commentStart + commentLen);
-                result = before + "<span class='hl-comment'>" + comment + "</span>" + after;
-            } else if (token.pattern.pattern() == getStringPattern().pattern()) {
-                int strStart = match.capturedStart(1);
-                int strLen = match.capturedLength(1);
-                QString before = result.mid(0, strStart);
-                QString str = result.mid(strStart, strLen);
-                QString after = result.mid(strStart + strLen);
-                result = before + "<span class='hl-string'>" + str + "</span>" + after;
-            } else if (token.pattern.pattern() == keywordRegex.pattern()) {
-                int kwStart = match.capturedStart(1);
-                int kwLen = match.capturedLength(1);
-                QString before = result.mid(0, kwStart);
-                QString kw = result.mid(kwStart, kwLen);
-                QString after = result.mid(kwStart + kwLen);
-                result = before + "<span class='hl-keyword'>" + kw + "</span>" + after;
-            } else if (token.pattern.pattern() == numberPattern.pattern()) {
-                int numStart = match.capturedStart(1);
-                int numLen = match.capturedLength(1);
-                QString before = result.mid(0, numStart);
-                QString num = result.mid(numStart, numLen);
-                QString after = result.mid(numStart + numLen);
-                result = before + "<span class='hl-number'>" + num + "</span>" + after;
-            } else if (token.pattern.pattern() == getPreprocessorPattern().pattern()) {
-                int ppStart = match.capturedStart(1);
-                int ppLen = match.capturedLength(1);
-                QString before = result.mid(0, ppStart);
-                QString pp = result.mid(ppStart, ppLen);
-                QString after = result.mid(ppStart + ppLen);
-                result = before + "<span class='hl-preproc'>" + pp + "</span>" + after;
+            int matchStart = match.capturedStart(0); // Use full match (group 0)
+            int matchLen = match.capturedLength(0);
+            
+            if (matchStart < 0 || matchLen <= 0) {
+                continue;
             }
+            
+            // Check if this match overlaps with an already-collected higher-priority match
+            bool overlaps = false;
+            for (const HighlightMatch &existing : allMatches) {
+                // existing has higher priority (lower number) or same priority
+                if (existing.priority > rule.priority) {
+                    continue; // Only higher-priority (lower number) matches can block
+                }
+                // Check overlap: two ranges [a, a+L) and [b, b+L)
+                if (matchStart < existing.start + existing.length &&
+                    matchStart + matchLen > existing.start) {
+                    overlaps = true;
+                    break;
+                }
+            }
+            if (overlaps) {
+                continue;
+            }
+            
+            allMatches.append({matchStart, matchLen, rule.priority, rule.cssClass});
         }
+    }
+    
+    // Step 2: Sort by position DESCENDING so replacements don't shift later positions
+    std::sort(allMatches.begin(), allMatches.end(),
+              [](const HighlightMatch &a, const HighlightMatch &b) {
+                  return a.start > b.start;
+              });
+    
+    // Step 3: Apply replacements from last to first (right-to-left in the string)
+    for (const HighlightMatch &m : allMatches) {
+        QString before = result.mid(0, m.start);
+        QString content = result.mid(m.start, m.length);
+        QString after = result.mid(m.start + m.length);
+        result = before + QStringLiteral("<span class='%1'>%2</span>").arg(m.cssClass, content) + after;
     }
     
     return result;

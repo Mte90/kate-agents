@@ -356,6 +356,62 @@ private slots:
         QCOMPARE(loaded[0].content, QStringLiteral("msg 0"));
         QCOMPARE(loaded[199].content, QStringLiteral("resp 99"));
     }
+
+    void testDeleteThreadCrossProject()
+    {
+        QString projectA = QStringLiteral("project-a-%1").arg(QDateTime::currentMSecsSinceEpoch());
+        QString projectB = QStringLiteral("project-b-%1").arg(QDateTime::currentMSecsSinceEpoch());
+        QString threadId = QStringLiteral("cross-delete-%1").arg(QDateTime::currentMSecsSinceEpoch());
+
+        ThreadJsonStorage::setCurrentProjectId(projectA);
+        QList<LLMMessage> msgs;
+        msgs.append({QStringLiteral("user"), QStringLiteral("cross-project test"), QString(), QString(), QString()});
+        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
+
+        QStringList threadsInA = ThreadJsonStorage::listThreads();
+        QVERIFY(threadsInA.contains(threadId));
+
+        ThreadJsonStorage::setCurrentProjectId(projectB);
+        QStringList threadsInB = ThreadJsonStorage::listThreads();
+        QVERIFY(!threadsInB.contains(threadId));
+
+        bool deleted = ThreadJsonStorage::deleteThread(threadId);
+        QVERIFY2(deleted, "deleteThread should find and delete the thread from project A's file");
+
+        ThreadJsonStorage::setCurrentProjectId(projectA);
+        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QCOMPARE(loaded.size(), 0);
+
+        QFile::remove(ThreadJsonStorage::getThreadFilePath(projectA));
+        QFile::remove(ThreadJsonStorage::getThreadFilePath(projectB));
+    }
+
+    void testDeleteThreadFallbackToAllFiles()
+    {
+        QString projectA = QStringLiteral("fallback-proj-a-%1").arg(QDateTime::currentMSecsSinceEpoch());
+        QString projectB = QStringLiteral("fallback-proj-b-%1").arg(QDateTime::currentMSecsSinceEpoch());
+        QString threadId = QStringLiteral("fallback-del-%1").arg(QDateTime::currentMSecsSinceEpoch());
+
+        ThreadJsonStorage::setCurrentProjectId(projectA);
+        QList<LLMMessage> msgs;
+        msgs.append({QStringLiteral("user"), QStringLiteral("thread in A"), QString(), QString(), QString()});
+        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
+
+        ThreadJsonStorage::setCurrentProjectId(projectB);
+
+        QStringList threadsInB = ThreadJsonStorage::listThreads();
+        QVERIFY(!threadsInB.contains(threadId));
+
+        bool deleted = ThreadJsonStorage::deleteThread(threadId);
+        QVERIFY2(deleted, "deleteThread should find and delete the thread from project A's file via fallback");
+
+        ThreadJsonStorage::setCurrentProjectId(projectA);
+        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QCOMPARE(loaded.size(), 0);
+
+        QFile::remove(ThreadJsonStorage::getThreadFilePath(projectA));
+        QFile::remove(ThreadJsonStorage::getThreadFilePath(projectB));
+    }
 };
 
 QTEST_MAIN(TestThreadJsonAdvanced)

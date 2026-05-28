@@ -96,7 +96,50 @@ target_link_libraries(test_threadview
 target_include_directories(test_threadview PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME test_threadview COMMAND test_threadview)
 
+# Streaming tests (new)
+add_executable(test_threadview_streaming test_threadview_streaming.cpp
+    ../src/ui/threadview.cpp
+    ../src/ui/syntaxhighlighter.cpp
+)
+set_target_properties(test_threadview_streaming PROPERTIES AUTOMOC ON)
+target_link_libraries(test_threadview_streaming
+    Qt6::Test
+    Qt6::Core
+    Qt6::Widgets
+    KF6::I18n
+)
+target_include_directories(test_threadview_streaming PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME test_threadview_streaming COMMAND test_threadview_streaming)
+
+# UI tests (new)
+add_executable(test_threadview_ui test_threadview_ui.cpp
+    ../src/ui/threadview.cpp
+    ../src/ui/syntaxhighlighter.cpp
+)
+set_target_properties(test_threadview_ui PROPERTIES AUTOMOC ON)
+target_link_libraries(test_threadview_ui
+    Qt6::Test
+    Qt6::Core
+    Qt6::Widgets
+    KF6::I18n
+)
+target_include_directories(test_threadview_ui PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME test_threadview_ui COMMAND test_threadview_ui)
+
 # === New comprehensive tests ===
+
+# SyntaxHighlighter direct tests
+add_executable(test_syntaxhighlighter test_syntaxhighlighter.cpp
+    ../src/ui/syntaxhighlighter.cpp
+)
+set_target_properties(test_syntaxhighlighter PROPERTIES AUTOMOC ON)
+target_include_directories(test_syntaxhighlighter PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_syntaxhighlighter
+    Qt6::Test
+    Qt6::Core
+    Qt6::Widgets
+)
+add_test(NAME test_syntaxhighlighter COMMAND test_syntaxhighlighter)
 
 # Retry and Abort tests
 add_executable(test_retry_abort test_retry_abort.cpp
