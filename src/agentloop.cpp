@@ -199,7 +199,11 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
         m_currentTools,
         model,
         // onChunk - emit each chunk as it arrives
-        [this](const QString &chunk) {
+        [this, hasEmittedResponseStarted = false](const QString &chunk) mutable {
+            if (!hasEmittedResponseStarted) {
+                hasEmittedResponseStarted = true;
+                emit responseStarted();
+            }
             emit responseChunk(chunk);
         },
         // onDone - handle final response - recursive pattern
@@ -274,7 +278,12 @@ void AgentLoop::saveAllThreads()
 {
     if (m_threadStorage) {
         for (auto it = m_threads.constBegin(); it != m_threads.constEnd(); ++it) {
-            m_threadStorage->saveThread(it.value());
+            const ConversationThread &thread = it.value();
+            if (thread.messages.isEmpty()) {
+                m_threadStorage->deleteThread(thread.id);
+            } else {
+                m_threadStorage->saveThread(thread);
+            }
         }
     }
 }
@@ -360,6 +369,8 @@ void AgentLoop::handleToolCalls(const std::vector<ToolCall> &toolCalls, const QS
         return;
     }
     
+    qDebug() << "handleToolCalls: processing" << toolCalls.size() << "tool calls";
+    
     if (!m_registry) {
         emit error("Tool registry not set");
         return;
@@ -380,16 +391,12 @@ void AgentLoop::handleToolCalls(const std::vector<ToolCall> &toolCalls, const QS
         const QString &toolName = toolCall.name;
         const QJsonObject &args = toolCall.arguments;
         
-        // Use QtConcurrent to execute tool calls in parallel
+        emit toolCallStarted(toolName, args);
+        
         futures[i] = QtConcurrent::run(
             [&, i]() -> QJsonObject {
-                // Emit start signal (all start signals fire immediately)
-                emit toolCallStarted(toolName, args);
-                
-                // Execute tool (already thread-safe per toolregistry.cpp)
                 QJsonObject result = m_registry->executeTool(toolName, args);
                 
-                // Store result in our indexed vector
                 QMutexLocker locker(&resultsMutex);
                 indexedResults[i] = {toolCallId, result};
                 
@@ -568,4 +575,24 @@ void AgentLoop::updateProjectIdFromCurrentFile()
     
     // Update project ID based on the file's git repo
     ThreadJsonStorage::setCurrentProjectIdFromFile(filePath);
+}
+
+void AgentLoop::deleteMessage(const QString &threadId, int index)
+{
+    if (!m_threads.contains(threadId)) {
+        return;
+    }
+    
+    auto &messages = m_threads[threadId].messages;
+    if (index >= 0 && index < messages.size()) {
+        messages.removeAt(index);
+        emit threadUpdated(threadId);
+    }
+}
+
+void AgentLoop::deleteThread(const QString &threadId)
+{
+    if (m_threads.contains(threadId)) {
+        m_threads.remove(threadId);
+    }
 }

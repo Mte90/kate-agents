@@ -129,7 +129,18 @@ void InputBar::showAutocompletePopup(int atIndex)
         items.append(tool);
     }
     
-    QDir projectDir = QDir::current();
+    QString projectRoot;
+    QProcess gitRootProcess;
+    gitRootProcess.start(QStringLiteral("git"), {QStringLiteral("rev-parse"), QStringLiteral("--show-toplevel")});
+    if (gitRootProcess.waitForFinished(1000) && gitRootProcess.exitCode() == 0) {
+        projectRoot = QString::fromUtf8(gitRootProcess.readAllStandardOutput()).trimmed();
+    }
+    
+    if (projectRoot.isEmpty()) {
+        projectRoot = QDir::current().absolutePath();
+    }
+    
+    QDir projectDir(projectRoot);
     if (projectDir.exists()) {
         QStringList files;
         QProcess gitProcess;

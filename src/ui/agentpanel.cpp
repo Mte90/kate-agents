@@ -128,6 +128,7 @@ void AgentPanel::connectSignals()
     connect(m_tabs, &QTabWidget::currentChanged, this, &AgentPanel::onCurrentTabChanged);
     
     if (m_agent) {
+        connect(m_agent, &AgentLoop::responseStarted, this, &AgentPanel::onResponseStarted);
         connect(m_agent, &AgentLoop::responseChunk, this, &AgentPanel::onResponseChunk);
         connect(m_agent, &AgentLoop::toolCallStarted, this, &AgentPanel::onToolCallStarted);
         connect(m_agent, &AgentLoop::toolCallCompleted, this, &AgentPanel::onToolCallCompleted);
@@ -175,6 +176,8 @@ void AgentPanel::createNewChatTab()
     int index = m_tabs->addTab(threadView, title);
     m_tabs->setTabToolTip(index, threadId);
     
+    connect(threadView, &ThreadView::deleteMessageRequested, this, &AgentPanel::onDeleteMessage);
+    
     m_tabs->setCurrentIndex(index);
     m_currentThreadId = threadId;
     
@@ -191,9 +194,13 @@ void AgentPanel::closeChatTab(int index)
     // Get the thread ID before removing the tab
     QString threadId = m_tabs->tabToolTip(index);
     
-    // Don't save, just delete the thread
-    if (!threadId.isEmpty() && m_threadStorage) {
-        m_threadStorage->deleteThread(threadId);
+    if (!threadId.isEmpty()) {
+        if (m_threadStorage) {
+            m_threadStorage->deleteThread(threadId);
+        }
+        if (m_agent) {
+            m_agent->deleteThread(threadId);
+        }
     }
     
     QWidget *widget = m_tabs->widget(index);
@@ -310,6 +317,7 @@ void AgentPanel::loadExistingThreads()
         // Use thread title if available, otherwise generate a default title
         QString title = thread.title;
         if (title.trimmed().isEmpty()) {
+            m_chatCounter++;
             title = generateChatTitle(m_chatCounter);
         }
         
@@ -317,9 +325,9 @@ void AgentPanel::loadExistingThreads()
         int index = m_tabs->addTab(threadView, title);
         m_tabs->setTabToolTip(index, thread.id);
         
-        threadView->loadMessages(thread.messages);
+        connect(threadView, &ThreadView::deleteMessageRequested, this, &AgentPanel::onDeleteMessage);
         
-        m_chatCounter++;
+        threadView->loadMessages(thread.messages);
     }
     
     if (m_tabs->count() > 0) {
@@ -342,6 +350,34 @@ void AgentPanel::onNewChat()
 void AgentPanel::onTabCloseRequested(int index)
 {
     closeChatTab(index);
+}
+
+void AgentPanel::onDeleteMessage(int messageId)
+{
+    Q_UNUSED(messageId);
+    if (m_currentThreadId.isEmpty() || !m_agent) {
+        return;
+    }
+    
+    auto threads = m_agent->getThreads();
+    if (!threads.contains(m_currentThreadId)) {
+        return;
+    }
+    
+    auto &messages = threads[m_currentThreadId].messages;
+    if (messages.isEmpty()) {
+        return;
+    }
+    
+    int lastIndex = messages.size() - 1;
+    m_agent->deleteMessage(m_currentThreadId, lastIndex);
+    
+    if (m_tabs->count() > 0) {
+        ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->currentWidget());
+        if (threadView) {
+            threadView->loadMessages(messages);
+        }
+    }
 }
 
 void AgentPanel::onCurrentTabChanged(int index)
@@ -449,6 +485,24 @@ void AgentPanel::onSystemPromptChanged(const QString &prompt)
     }
 }
 
+void AgentPanel::onResponseStarted()
+{
+    if (m_activeThreadId.isEmpty()) {
+        return;
+    }
+    
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        QString tabThreadId = m_tabs->tabToolTip(i);
+        if (tabThreadId == m_activeThreadId) {
+            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
+            if (threadView) {
+                threadView->resetStreaming();
+            }
+            break;
+        }
+    }
+}
+
 void AgentPanel::onResponseChunk(const QString &chunk)
 {
     // Find the tab for the active thread (not just currentIndex)
@@ -472,41 +526,81 @@ void AgentPanel::onResponseChunk(const QString &chunk)
 
 void AgentPanel::onToolCallStarted(const QString &toolName, const QJsonObject &args)
 {
-    int currentIndex = m_tabs->currentIndex();
-    if (currentIndex >= 0) {
-        ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(currentIndex));
-        if (threadView) {
-            threadView->appendToolCall(toolName, args);
+    if (m_activeThreadId.isEmpty()) {
+        return;
+    }
+    
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        QString tabThreadId = m_tabs->tabToolTip(i);
+        if (tabThreadId == m_activeThreadId) {
+            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
+            if (threadView) {
+                threadView->appendToolCall(toolName, args);
+            }
+            break;
         }
     }
 }
 
 void AgentPanel::onToolCallCompleted(const QString &toolName, const QJsonObject &result)
 {
-    int currentIndex = m_tabs->currentIndex();
-    if (currentIndex >= 0) {
-        ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(currentIndex));
-        if (threadView) {
-            threadView->appendToolResult(toolName, result);
+    if (m_activeThreadId.isEmpty()) {
+        return;
+    }
+    
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        QString tabThreadId = m_tabs->tabToolTip(i);
+        if (tabThreadId == m_activeThreadId) {
+            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
+            if (threadView) {
+                threadView->appendToolResult(toolName, result);
+            }
+            break;
         }
     }
 }
 
 void AgentPanel::onTurnCompleted()
 {
-    int currentIndex = m_tabs->currentIndex();
-    if (currentIndex >= 0) {
-        ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(currentIndex));
-        if (threadView) {
-            threadView->endStreaming();
+    if (m_activeThreadId.isEmpty()) {
+        return;
+    }
+    
+    QString thinking;
+    QString content;
+    
+    if (m_agent) {
+        auto &threads = m_agent->getThreads();
+        if (threads.contains(m_activeThreadId)) {
+            auto &messages = threads[m_activeThreadId].messages;
+            if (!messages.isEmpty()) {
+                auto &lastMsg = messages.last();
+                thinking = lastMsg.thinking;
+                content = lastMsg.content;
+            }
+        }
+    }
+    
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        if (m_tabs->tabToolTip(i) == m_activeThreadId) {
+            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
+            if (threadView) {
+                if (!thinking.isEmpty()) {
+                    threadView->appendAssistantMessage(content, thinking);
+                } else {
+                    threadView->endStreaming();
+                }
+            }
+            break;
         }
     }
     
     saveCurrentThread();
     
     // Trigger async LLM title generation if tab still has default title
-    if (m_agent && currentIndex >= 0) {
-        QString currentTitle = m_tabs->tabText(currentIndex);
+    int currentIdx = m_tabs->currentIndex();
+    if (m_agent && currentIdx >= 0) {
+        QString currentTitle = m_tabs->tabText(currentIdx);
         if (currentTitle.startsWith("Chat ") && !m_pendingTitleTabs.contains(m_currentThreadId)) {
             m_pendingTitleTabs.insert(m_currentThreadId);
             m_agent->generateTitleFromMessages(m_currentThreadId);

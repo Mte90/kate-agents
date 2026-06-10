@@ -42,7 +42,7 @@ public:
 
     QString name() const override { return "url_fetch"; }
     QString description() const override {
-        return i18n("Retrieves and extracts text content from a URL");
+        return i18n("Fetch a webpage - takes a URL and returns the text content");
     }
 
     QJsonObject parametersSchema() const override {

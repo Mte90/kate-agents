@@ -96,6 +96,7 @@ public slots:
     void onModelChanged(const QString &model);
 
 private slots:
+    void onResponseStarted();
     void onResponseChunk(const QString &chunk);
     void onSystemPromptChanged(const QString &prompt);
     void onToolCallStarted(const QString &toolName, const QJsonObject &args);
@@ -107,6 +108,7 @@ private slots:
     void onPermissionRequested(const QString &toolName);
     void onNewChat();
     void onTabCloseRequested(int index);
+    void onDeleteMessage(int messageId);
     void onCurrentTabChanged(int index);
     void updateModelFromSettings();
     void renameChatTab(int index);

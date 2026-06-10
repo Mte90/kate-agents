@@ -18,7 +18,7 @@ public:
 
     QString name() const override { return "edit_file"; }
     QString description() const override {
-        return i18n("Edits a file by replacing old_text with new_text.");
+        return i18n("Edit a file - specify file path, old text to find, and new text to replace it with");
     }
 
     QJsonObject parametersSchema() const override {

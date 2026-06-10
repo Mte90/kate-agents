@@ -16,7 +16,7 @@ public:
 
     QString name() const override { return "apply_diff"; }
     QString description() const override {
-        return i18n("Applies a unified diff to a file. Use this to make targeted edits.");
+        return i18n("Apply a diff patch - takes unified diff text and applies changes to file");
     }
 
     QJsonObject parametersSchema() const override {

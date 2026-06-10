@@ -3,6 +3,9 @@
 #include "../src/toolregistry.h"
 #include "../src/llmprovider.h"
 #include <QSignalSpy>
+#include <QTimer>
+#include <QJsonObject>
+#include <QDateTime>
 
 class MockLLMProvider : public LLMProvider
 {
@@ -12,6 +15,9 @@ public:
     QString name() const override { return QStringLiteral("mock"); }
     bool isAvailable() override { return true; }
     QStringList availableModels() override { return {QStringLiteral("test-model")}; }
+
+    bool simulateToolCall = false;
+    ToolCall mockToolCall;
 
     QFuture<LLMResponse> chat(const std::vector<LLMMessage> &,
                                const std::vector<ToolDefinition> &,
@@ -32,7 +38,11 @@ public:
     {
         if (onDone) {
             LLMResponse resp;
-            resp.content = QStringLiteral("mock");
+            if (simulateToolCall) {
+                resp.toolCalls.push_back(mockToolCall);
+            } else {
+                resp.content = QStringLiteral("mock");
+            }
             onDone(resp);
         }
     }
@@ -339,6 +349,76 @@ private slots:
         AgentLoop loop(&provider, &registry);
 
         loop.saveAllThreads();
+    }
+
+    void testToolCallSignals()
+    {
+        MockLLMProvider provider;
+        provider.simulateToolCall = true;
+        provider.mockToolCall.id = "call_123";
+        provider.mockToolCall.name = "read_file";
+        provider.mockToolCall.arguments = QJsonObject{{"path", "/test.cpp"}};
+        
+        ToolRegistry registry;
+        AgentLoop loop(&provider, &registry);
+        
+        QSignalSpy spyToolStarted(&loop, &AgentLoop::toolCallStarted);
+        QSignalSpy spyToolCompleted(&loop, &AgentLoop::toolCallCompleted);
+        
+        QString threadId = QStringLiteral("test-toolcall-%1").arg(QDateTime::currentMSecsSinceEpoch());
+        loop.createThread(threadId);
+        loop.addUserMessage(threadId, "Read /test.cpp");
+        
+        QTimer timer;
+        timer.setSingleShot(true);
+        timer.start(5000);
+        QObject::connect(&loop, &AgentLoop::turnCompleted, &timer, &QTimer::stop);
+        QObject::connect(&timer, &QTimer::timeout, &loop, &AgentLoop::abort);
+        
+        loop.executeTurn(threadId);
+        
+        QVERIFY2(spyToolStarted.count() > 0, "toolCallStarted should be emitted");
+        QVERIFY2(spyToolCompleted.count() > 0, "toolCallCompleted should be emitted");
+    }
+
+    void testDeleteThreadRemovesFromMemory()
+    {
+        MockLLMProvider provider;
+        ToolRegistry registry;
+        AgentLoop loop(&provider, &registry);
+        
+        QString threadId = QStringLiteral("test-delete-%1").arg(QDateTime::currentMSecsSinceEpoch());
+        loop.createThread(threadId);
+        loop.addUserMessage(threadId, "test message");
+        
+        QVERIFY(loop.getThreads().contains(threadId));
+        
+        loop.deleteThread(threadId);
+        
+        QVERIFY2(!loop.getThreads().contains(threadId), "Thread should be removed from memory after deleteThread");
+    }
+
+    void testThinkingStoredInMessage()
+    {
+        MockLLMProvider provider;
+        ToolRegistry registry;
+        AgentLoop loop(&provider, &registry);
+        
+        QString threadId = QStringLiteral("test-thinking-%1").arg(QDateTime::currentMSecsSinceEpoch());
+        loop.createThread(threadId);
+        
+        auto &threads = loop.getThreads();
+        QVERIFY(threads.contains(threadId));
+        
+        LLMMessage msg;
+        msg.role = "assistant";
+        msg.content = "Final answer";
+        msg.thinking = "Let me think about this...";
+        threads[threadId].messages.push_back(msg);
+        
+        auto &messages = threads[threadId].messages;
+        QVERIFY(messages.size() > 0);
+        QVERIFY2(messages[0].thinking == "Let me think about this...", "Thinking should be stored in message");
     }
 };
 

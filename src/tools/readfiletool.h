@@ -15,7 +15,7 @@ public:
 
     QString name() const override { return "read_file"; }
     QString description() const override {
-        return i18n("Reads the content of a file in the project.");
+        return i18n("Read a file - specify the full path to display its contents");
     }
 
     QJsonObject parametersSchema() const override {

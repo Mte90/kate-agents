@@ -57,7 +57,7 @@ public:
 
     QString name() const override { return "terminal"; }
     QString description() const override {
-        return i18n("Executes a shell command and returns stdout + stderr.");
+        return i18n("Run a terminal command - returns stdout and stderr output");
     }
 
     QJsonObject parametersSchema() const override {

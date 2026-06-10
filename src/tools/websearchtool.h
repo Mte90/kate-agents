@@ -42,7 +42,7 @@ public:
 
     QString name() const override { return "web_search"; }
     QString description() const override {
-        return i18n("Searches the web and returns relevant results with summaries");
+        return i18n("Search the web - takes a query, returns results with summaries");
     }
 
     QJsonObject parametersSchema() const override {

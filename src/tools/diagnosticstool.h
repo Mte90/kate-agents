@@ -15,7 +15,7 @@ public:
 
     QString name() const override { return "diagnostics"; }
     QString description() const override {
-        return i18n("Retrieves diagnostics (errors and warnings) for a file or the entire project. Note: Diagnostics API not available in this KTextEditor version.");
+        return i18n("Get code errors and warnings - takes optional file path or checks entire project");
     }
 
     void setMainWindow(KTextEditor::MainWindow *mw) {

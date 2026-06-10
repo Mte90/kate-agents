@@ -25,6 +25,7 @@ public:
     void appendToolCall(const QString &toolName, const QJsonObject &args);
     void appendToolResult(const QString &toolName, const QJsonObject &result);
     void showStreamingChunk(const QString &chunk);
+    void resetStreaming();
     void endStreaming();
     void clear();
     void scrollToBottom();
@@ -42,6 +43,7 @@ protected:
     
 signals:
     void linkClicked(const QString &url);
+    void deleteMessageRequested(int messageId);
 private slots:
     void toggleCursor();
     void onAnchorClicked(const QUrl &url);
@@ -49,6 +51,7 @@ private slots:
 private:
     static constexpr int MAX_VISIBLE_MESSAGES = 100;
     
+    bool m_isFirstMessage = true;
     bool m_cursorVisible = true;
     QList<LLMMessage> m_allMessages;
     QString parseMarkdown(const QString &text);

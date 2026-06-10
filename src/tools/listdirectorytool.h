@@ -18,7 +18,7 @@ public:
     QString name() const override { return "listdirectory"; }
 
     QString description() const override {
-        return i18n("Lists contents of a directory with optional recursive option.");
+        return i18n("List directory contents - takes optional path, shows files and subfolders");
     }
 
     QJsonObject parametersSchema() const override {

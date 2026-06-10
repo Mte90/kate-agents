@@ -17,7 +17,7 @@ public:
 
     QString name() const override { return "grep"; }
     QString description() const override {
-        return i18n("Searches files in the project using a regex pattern.");
+        return i18n("Search text in files - takes pattern and optional file path");
     }
 
     QJsonObject parametersSchema() const override {

@@ -22,9 +22,8 @@ ThreadView::ThreadView(QWidget *parent)
     setMinimumWidth(0);
     setMinimumHeight(0);
     
-    // Ensure proper word wrapping and text reflow
     setWordWrapMode(QTextOption::WordWrap);
-    document()->setTextWidth(400);
+    document()->setTextWidth(QWIDGETSIZE_MAX);
 
     // Handle anchor clicks for "show older messages" link
     connect(this, &QTextBrowser::anchorClicked, this, &ThreadView::onAnchorClicked);
@@ -175,14 +174,19 @@ void ThreadView::appendHtml(const QString &html)
     scrollToBottom();
 }
 
+static int s_messageId = 0;
+
 void ThreadView::appendUserMessage(const QString &message, const QString &profile)
 {
     QString header = i18n("User:");
     if (!profile.isEmpty()) {
         header += QString(" <span style='font-weight: normal; font-size: 0.85em; color: " + palette().color(QPalette::Highlight).name() + ";'>[%1]</span>").arg(escapeHtml(profile));
     }
-    appendHtml(QString("<hr><div class='user-message'><strong>%1</strong><br>%2</div>")
-               .arg(header, parseMarkdown(message)));
+    QString prefix = m_isFirstMessage ? "" : "<hr>";
+    m_isFirstMessage = false;
+    int msgId = ++s_messageId;
+    appendHtml(prefix + QString("<div class='user-message' id='msg_%1' style='position:relative'><a href='delete:%1' style='position:absolute;right:8px;top:4px;color:#888;text-decoration:none;font-size:0.7em;'>✕</a><strong>%2</strong><br>%3</div>")
+               .arg(QString::number(msgId), header, parseMarkdown(message)));
 }
 
 void ThreadView::appendAssistantMessage(const QString &message, const QString &thinking)
@@ -193,8 +197,11 @@ void ThreadView::appendAssistantMessage(const QString &message, const QString &t
                    .arg(escapeHtml(thinking));
     }
     
-    content += QString("<div class='assistant-message'>%1</div>").arg(parseMarkdown(message));
-    appendHtml("<hr>" + content);
+    int msgId = ++s_messageId;
+    content += QString("<div class='assistant-message' id='msg_%1' style='position:relative'><a href='delete:%1' style='position:absolute;right:8px;top:4px;color:#888;text-decoration:none;font-size:0.7em;'>✕</a>%2</div>").arg(QString::number(msgId), parseMarkdown(message));
+    QString prefix = m_isFirstMessage ? "" : "<hr>";
+    m_isFirstMessage = false;
+    appendHtml(prefix + content);
 }
 
 void ThreadView::appendToolCall(const QString &toolName, const QJsonObject &args)
@@ -293,6 +300,12 @@ void ThreadView::showStreamingChunk(const QString &chunk)
     }
 }
 
+void ThreadView::resetStreaming()
+{
+    m_streamingContent.clear();
+    m_streamingThinking.clear();
+}
+
 void ThreadView::endStreaming()
 {
     m_cursorTimer->stop();
@@ -337,6 +350,7 @@ void ThreadView::clear()
     m_cursorTimer->stop();
     m_cursorVisible = true;
     m_cursorBlinkCount = 0;
+    m_isFirstMessage = true;
 }
 
 void ThreadView::toggleCursor()
@@ -394,14 +408,18 @@ void ThreadView::setSource(const QUrl &name)
 
 void ThreadView::onAnchorClicked(const QUrl &url)
 {
-    if (url.toString() == "show-all") {
+    QString urlStr = url.toString();
+    if (urlStr == "show-all") {
         loadMessages(m_allMessages);
-    } else if (url.toString().startsWith("copy:")) {
-        QString id = url.toString().mid(5); // Remove "copy:" prefix
+    } else if (urlStr.startsWith("copy:")) {
+        QString id = urlStr.mid(5);
         if (m_codeBlocks.contains(id)) {
             QClipboard *clipboard = QApplication::clipboard();
             clipboard->setText(m_codeBlocks[id]);
         }
+    } else if (urlStr.startsWith("delete:")) {
+        QString id = urlStr.mid(7);
+        emit deleteMessageRequested(id.toInt());
     }
 }
 

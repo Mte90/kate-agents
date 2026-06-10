@@ -52,9 +52,14 @@ public:
     void abort();
     void saveAllThreads();
     void generateTitleFromMessages(const QString &threadId);
+    void deleteMessage(const QString &threadId, int index);
+    void deleteThread(const QString &threadId);
+    QMap<QString, ConversationThread> &getThreads() { return m_threads; }
 
 signals:
+    void responseStarted();
     void responseChunk(const QString &chunk);
+    void thinkingChunk(const QString &thinking);
     void toolCallStarted(const QString &toolName, const QJsonObject &args);
     void toolCallCompleted(const QString &toolName, const QJsonObject &result);
     void turnCompleted(const QString &threadId);

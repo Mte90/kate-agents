@@ -17,7 +17,7 @@ public:
     QString name() const override { return "createdirectory"; }
 
     QString description() const override {
-        return i18n("Creates a new directory (including parent directories if needed).");
+        return i18n("Create a new directory - takes path, creates parent dirs if needed");
     }
 
     QJsonObject parametersSchema() const override {

@@ -15,7 +15,7 @@ public:
 
     QString name() const override { return "findpath"; }
     QString description() const override {
-        return i18n("Finds files or directories matching a pattern using find command.");
+        return i18n("Find files by name - takes a pattern like *.cpp or filename");
     }
 
     QJsonObject parametersSchema() const override {
