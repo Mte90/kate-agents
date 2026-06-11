@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QMap>
+#include <QMutex>
 
 enum class PermissionPolicy {
     Allow,
@@ -43,6 +44,7 @@ private:
     PermissionPolicy m_defaultPolicy = PermissionPolicy::Confirm;
     QMap<QString, PermissionPolicy> m_toolPolicies;
     QMap<QString, bool> m_sessionPermissions;
+    mutable QMutex m_mutex;
 };
 
 #endif

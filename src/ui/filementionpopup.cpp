@@ -109,7 +109,6 @@ void FileMentionPopup::showAt(const QPoint &pos)
     }
 
     setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
-    setParent(nullptr);
     setGeometry(pos.x(), pos.y(), m_listView->width(), m_listView->height());
     show();
 }

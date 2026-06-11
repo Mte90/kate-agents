@@ -75,6 +75,13 @@ void ContextMenuHandler::onAskAgentAboutThis()
         return;
     }
 
+    // Check if document is text-based (not binary)
+    KTextEditor::Document *doc = view->document();
+    QString mimeType = doc->mimeType();
+    if (mimeType.startsWith("image/") || mimeType.startsWith("application/octet-stream")) {
+        return;
+    }
+
     int cursorLine = view->cursorPosition().line();
     int cursorCol = view->cursorPosition().column();
     

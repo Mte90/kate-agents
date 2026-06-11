@@ -94,22 +94,30 @@ static bool saveThreadsFile(const QString &projectId, const QJsonObject &data)
     QFile file(filePath);
     
     if (!file.open(QIODevice::WriteOnly)) {
-        // ThreadJsonStorage::saveThreadsFile - Failed to open threads file for writing: << filePath
         return false;
     }
     
     QJsonDocument doc(data);
     QByteArray jsonBytes = doc.toJson(QJsonDocument::Indented);
     
-    file.write(jsonBytes);
+    qint64 written = file.write(jsonBytes);
     file.close();
     
+    if (written != jsonBytes.size()) {
+        return false;
+    }
     
-    // Verify the file was actually written
+    // Verify the file was written correctly
     QFile verifyFile(filePath);
-    if (verifyFile.open(QIODevice::ReadOnly)) {
-        QByteArray verifyData = verifyFile.readAll();
-        verifyFile.close();
+    if (!verifyFile.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    
+    QByteArray verifyData = verifyFile.readAll();
+    verifyFile.close();
+    
+    if (verifyData != jsonBytes) {
+        return false;
     }
     
     return true;

@@ -75,6 +75,8 @@ private:
     void callLLMInternal(const QString &threadId, const QString &model);
     QString generateTitle(const QString &firstMessage);
     void updateProjectIdFromCurrentFile();
+    
+    QMutex m_iterationMutex;
 
     LLMProvider *m_provider = nullptr;
     ToolRegistry *m_registry = nullptr;

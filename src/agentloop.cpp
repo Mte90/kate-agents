@@ -80,6 +80,10 @@ void AgentLoop::setMainWindow(KTextEditor::MainWindow *mw)
         connect(m_mainWindow, &KTextEditor::MainWindow::viewCreated, this,
                 [this](KTextEditor::View *view) {
                     view->registerInlineNoteProvider(m_ghostTextProvider);
+                    // Cleanup when view is destroyed
+                    connect(view, &QObject::destroyed, this, [this, view]() {
+                        view->unregisterInlineNoteProvider(m_ghostTextProvider);
+                    });
                     // Update project ID when a new view is created
                     updateProjectIdFromCurrentFile();
                 });
@@ -163,6 +167,7 @@ void AgentLoop::executeTurn(const QString &threadId, const QString &model)
 
     m_isRunning = true;
     m_currentThreadId = threadId;
+    QMutexLocker locker(&m_iterationMutex);
     m_currentIteration = 0;
 
     // Use provided model, or fall back to thread's model, or use first available
@@ -181,7 +186,6 @@ void AgentLoop::executeTurn(const QString &threadId, const QString &model)
             return;
         }
     }
-
 
     // Start the iterative loop - call LLM for the first time
     callLLMInternal(threadId, modelToUse);
@@ -232,7 +236,10 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
                 handleToolCalls(final.toolCalls, threadId);
                 
                 // Increment iteration and recursively call executeTurn to continue loop
-                m_currentIteration++;
+                {
+                    QMutexLocker locker(&m_iterationMutex);
+                    m_currentIteration++;
+                }
                 if (m_currentIteration < m_maxIterations) {
                     executeTurn(threadId);
                 } else {
@@ -294,7 +301,8 @@ void AgentLoop::buildRequest(const QString &threadId)
     constexpr int maxTokens = 4000;
     constexpr int charsPerToken = 4;
     constexpr int maxChars = maxTokens * charsPerToken;
-    
+    constexpr size_t minMessagesToKeep = 10;
+
     auto it = m_threads.find(threadId);
     if (it == m_threads.end()) {
         emit error(QString("Thread not found: %1").arg(threadId));
@@ -324,9 +332,9 @@ void AgentLoop::buildRequest(const QString &threadId)
             startIndex++;
         }
         
-        // Ensure we keep at least some messages (minimum 10 non-system messages)
-        if (startIndex > totalMessages - static_cast<size_t>(10)) {
-            startIndex = std::max(static_cast<size_t>(hasSystemPrompt ? 1 : 0), totalMessages - static_cast<size_t>(10));
+        // Ensure we keep at least some messages (minimum minMessagesToKeep non-system messages)
+        if (startIndex > totalMessages - minMessagesToKeep) {
+            startIndex = std::max(static_cast<size_t>(hasSystemPrompt ? 1 : 0), totalMessages - minMessagesToKeep);
         }
     }
 

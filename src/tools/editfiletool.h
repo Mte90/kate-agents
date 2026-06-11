@@ -70,6 +70,14 @@ public:
         QString content = in.readAll();
         file.close();
         
+        // Check for empty file
+        if (content.isEmpty()) {
+            return QJsonObject{
+                {"warning", i18n("File is empty - this will overwrite an empty file")},
+                {"success", false}
+            };
+        }
+        
         int count = content.count(oldText);
         if (count == 0) {
             return QJsonObject{

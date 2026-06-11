@@ -29,7 +29,11 @@ private:
             "dd", "mkfs", "fdisk", "parted",
             "apt", "apt-get", "yum", "dnf", "pacman", "zypper", "brew",
             "systemctl", "service", "init", "shutdown", "reboot", "halt",
-            "modprobe", "insmod", "rmmod", "mknod"
+            "modprobe", "insmod", "rmmod", "mknod",
+            "ping", "ping6", "traceroute", "tracepath", "arp", "arping",
+            "nmap", "ssh", "scp", "rsync", "sftp",
+            "iptables", "ip6tables", "firewall-cmd", "ufw",
+            "nmcli", "ip", "ifconfig", "route", "netstat", "ss"
         };
         return commands;
     }

@@ -32,6 +32,7 @@ bool PermissionManager::requiresConfirmation(const QString &toolName) const
 
 bool PermissionManager::isAllowed(const QString &toolName) const
 {
+    QMutexLocker locker(&m_mutex);
     if (m_sessionPermissions.contains(toolName)) {
         return m_sessionPermissions[toolName];
     }
@@ -41,26 +42,32 @@ bool PermissionManager::isAllowed(const QString &toolName) const
 
 bool PermissionManager::requestPermission(const QString &toolName)
 {
-    emit permissionRequested(toolName);
     if (!requiresConfirmation(toolName)) {
         return isAllowed(toolName);
     }
+    
+    emit permissionRequested(toolName);
+    // Permission will be granted/denied asynchronously via grantPermission/denyPermission
+    // Returns false to indicate waiting for user response
     return false;
 }
 
 void PermissionManager::grantPermission(const QString &toolName)
 {
+    QMutexLocker locker(&m_mutex);
     m_sessionPermissions[toolName] = true;
     emit permissionGranted(toolName);
 }
 
 void PermissionManager::denyPermission(const QString &toolName)
 {
+    QMutexLocker locker(&m_mutex);
     m_sessionPermissions[toolName] = false;
     emit permissionDenied(toolName);
 }
 
 void PermissionManager::clearSessionPermissions()
 {
+    QMutexLocker locker(&m_mutex);
     m_sessionPermissions.clear();
 }
