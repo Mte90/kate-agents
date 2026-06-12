@@ -62,6 +62,7 @@ set(PROJECT_SOURCES
     src/threadstorage.cpp
     src/contextmenhander.h
     src/contextmenhander.cpp
+    src/ithreadstorage.h
     src/threadjson.h
     src/threadjson.cpp
     src/tools/readfiletool.h

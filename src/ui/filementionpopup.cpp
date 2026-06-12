@@ -109,7 +109,27 @@ void FileMentionPopup::showAt(const QPoint &pos)
     }
 
     setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
-    setGeometry(pos.x(), pos.y(), m_listView->width(), m_listView->height());
+
+    // Calculate popup size and clamp to screen bounds
+    int width = m_listView->width();
+    int height = m_listView->height();
+
+    QScreen *screen = QGuiApplication::screenAt(pos);
+    if (!screen) {
+        screen = QGuiApplication::primaryScreen();
+    }
+    QRect screenGeom = screen->availableGeometry();
+
+    // Clamp X to keep within horizontal bounds
+    int x = qBound(screenGeom.left(), pos.x(), screenGeom.right() - width);
+    // Clamp Y and adjust if popup would go below screen
+    int y = pos.y();
+    if (y + height > screenGeom.bottom()) {
+        y = pos.y() - height;  // Show above input instead
+    }
+    y = qBound(screenGeom.top(), y, screenGeom.bottom() - height);
+
+    setGeometry(x, y, width, height);
     show();
 }
 

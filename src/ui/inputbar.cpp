@@ -1,3 +1,4 @@
+
 #include "inputbar.h"
 #include "filementionpopup.h"
 #include "agentloop.h"
@@ -8,39 +9,42 @@
 #include <QMetaEnum>
 #include <QAbstractTextDocumentLayout>
 #include <QProcess>
+#include <QTimer>
+#include <QPainter>
 
 InputBar::InputBar(QWidget *parent)
     : QWidget(parent)
+    , m_isRunning(false)
+    , m_retryVisible(false)
 {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     setMinimumWidth(0);
-    setMinimumHeight(0);
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(5, 5, 5, 5);
-    mainLayout->setSpacing(5);
     
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(8, 8, 8, 8);
+    mainLayout->setSpacing(6);
+    
+
     m_inputEdit = new QTextEdit(this);
-    m_inputEdit->setPlaceholderText(i18n("Type a message to the agent... (@ for tools)"));
+    m_inputEdit->setPlaceholderText(i18n("Type a message... (@ for tools)"));
     m_inputEdit->setAcceptRichText(false);
-    m_inputEdit->setMinimumWidth(0);
     m_inputEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_inputEdit->setFrameStyle(QFrame::StyledPanel | QFrame::Plain);
     connect(m_inputEdit, &QTextEdit::textChanged, this, &InputBar::onTextChanged);
     mainLayout->addWidget(m_inputEdit, 1);
     
+
     QHBoxLayout *bottomRow = new QHBoxLayout();
-    bottomRow->setSpacing(4);
+    bottomRow->setSpacing(8);
+    bottomRow->setContentsMargins(0, 4, 0, 0);
     
+
     m_modelCombo = new QComboBox(this);
-    m_modelCombo->setMinimumWidth(120);
-    m_modelCombo->setToolTip(i18n("Select the model to use for chat"));
+    m_modelCombo->setMinimumWidth(100);
+    m_modelCombo->setToolTip(i18n("Select model"));
     bottomRow->addWidget(m_modelCombo);
-    connect(m_modelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, [this](int) { 
-                if (m_modelCombo->currentIndex() >= 0) {
-                    emit modelChanged(m_modelCombo->currentText()); 
-                }
-            });
     
+
     m_profileCombo = new QComboBox(this);
     m_profileCombo->addItem(i18n("Write"));
     m_profileCombo->addItem(i18n("Ask"));
@@ -51,27 +55,45 @@ InputBar::InputBar(QWidget *parent)
     
     bottomRow->addStretch();
     
-    m_sendButton = new QPushButton(i18n("Invia"), this);
+
+    m_retryButton = new QPushButton(i18n("↻ Retry"), this);
+    m_retryButton->setStyleSheet("QPushButton { background-color: #f39c12; color: white; border: none; padding: 6px 12px; border-radius: 4px; } QPushButton:hover { background-color: #e67e22; }");
+    m_retryButton->setVisible(false);
+    connect(m_retryButton, &QPushButton::clicked, this, &InputBar::retryRequested);
+    bottomRow->addWidget(m_retryButton);
+    
+
+    m_sendButton = new QPushButton(i18n("Send"), this);
+    m_sendButton->setStyleSheet("QPushButton { background-color: palette(button); color: palette(button-text); border: 1px solid palette(mid); border-radius: 4px; padding: 6px 16px; font-weight: bold; } QPushButton:hover { background-color: palette(light); } QPushButton:disabled { background-color: palette(mid); color: palette(midtext); }");
     connect(m_sendButton, &QPushButton::clicked, this, &InputBar::onSendClicked);
     bottomRow->addWidget(m_sendButton);
     
+
+    m_loadingIndicator = new QLabel(this);
+    m_loadingIndicator->setFixedWidth(60);
+    m_loadingIndicator->setAlignment(Qt::AlignCenter);
+    m_loadingIndicator->setVisible(false);
+    m_loadingTimer = new QTimer(this);
+    m_loadingTimer->setInterval(150);
+    connect(m_loadingTimer, &QTimer::timeout, this, &InputBar::updateLoadingIndicator);
+    bottomRow->addWidget(m_loadingIndicator);
+    
     mainLayout->addLayout(bottomRow);
     
-    // Initialize FileMentionPopup
+
     m_filePopup = new FileMentionPopup(this);
-    connect(m_filePopup, &FileMentionPopup::fileSelected, this, &InputBar::insertFilePath);
+    // connect(m_filePopup, &FileMentionPopup::fileSelected, this, &InputBar::insertFilePath);
     m_filePopup->setInputEdit(m_inputEdit);
-    
-    // Install event filter for Tab key handling
     m_inputEdit->installEventFilter(this);
     
-    // Set default system prompt based on selected profile
+
     QString profile = m_profileCombo->currentText();
     AgentProfile profileEnum = stringToProfile(profile);
-    QString prompt = systemPromptForProfile(profileEnum);
-    m_systemPrompt = prompt;
+    m_systemPrompt = systemPromptForProfile(profileEnum);
     emit systemPromptChanged(m_systemPrompt);
-}InputBar::~InputBar() = default;
+}
+
+InputBar::~InputBar() = default;
 
 void InputBar::setModels(const QStringList &models)
 {
@@ -86,36 +108,74 @@ void InputBar::setModels(const QStringList &models)
 void InputBar::onSendClicked()
 {
     QString text = m_inputEdit->toPlainText().trimmed();
-    if (!text.isEmpty()) {
+    if (!text.isEmpty() && !m_isRunning) {
         emit sendMessage(text);
-    }
-}
-
-void InputBar::onReturnPressed()
-{
-    if (!m_isRunning) {
-        onSendClicked();
     }
 }
 
 void InputBar::onTextChanged()
 {
-    m_sendButton->setEnabled(!m_inputEdit->toPlainText().trimmed().isEmpty());
+    bool hasText = !m_inputEdit->toPlainText().trimmed().isEmpty();
+    m_sendButton->setEnabled(hasText && !m_isRunning);
     
-    QString text = m_inputEdit->toPlainText();
-    QTextCursor cursor = m_inputEdit->textCursor();
-    int cursorPos = cursor.position();
-    
-    int atIndex = text.lastIndexOf('@', cursorPos - 1);
-    if (atIndex >= 0 && atIndex < cursorPos - 1) {
-        QString afterAt = text.mid(atIndex + 1, cursorPos - atIndex - 1);
-        if (!afterAt.contains(' ') && !afterAt.contains('\n')) {
-            showAutocompletePopup(atIndex);
-            return;
-        }
-    }
-    
+    // Autocomplete functionality removed - using FileMentionPopup for @ mentions
     m_filePopup->hide();
+}
+
+void InputBar::setRunningState(bool running)
+{
+    m_isRunning = running;
+    
+    if (running) {
+        m_sendButton->setVisible(false);
+        m_loadingIndicator->setVisible(true);
+        m_loadingTimer->start();
+        m_loadingDotCount = 0;
+        m_retryButton->setVisible(false);
+    } else {
+        m_sendButton->setVisible(true);
+        m_loadingIndicator->setVisible(false);
+        m_loadingTimer->stop();
+        m_sendButton->setText(i18n("Send"));
+        m_inputEdit->setEnabled(true);
+        m_inputEdit->setFocus();
+        m_filePopup->hidePopup();
+    }
+}
+
+void InputBar::showErrorWithRetry(const QString &error)
+{
+    Q_UNUSED(error)
+    m_isRunning = false;
+    m_loadingTimer->stop();
+    m_loadingIndicator->setVisible(false);
+    m_sendButton->setText(i18n("Send"));
+    m_retryButton->setVisible(true);
+    m_inputEdit->setEnabled(true);
+    m_inputEdit->setFocus();
+}
+
+void InputBar::updateLoadingIndicator()
+{
+    m_loadingDotCount = (m_loadingDotCount + 1) % 4;
+    QString dots;
+    for (int i = 0; i < m_loadingDotCount; ++i) {
+        dots += ".";
+    }
+    m_loadingIndicator->setText(dots);
+}
+
+void InputBar::onReturnPressed()
+{
+    onSendClicked();
+}
+
+void InputBar::onProfileChanged(int /*index*/)
+{
+    QString profile = m_profileCombo->currentText();
+    AgentProfile profileEnum = stringToProfile(profile);
+    m_systemPrompt = systemPromptForProfile(profileEnum);
+    emit systemPromptChanged(m_systemPrompt);
 }
 
 void InputBar::showAutocompletePopup(int atIndex)
@@ -129,39 +189,10 @@ void InputBar::showAutocompletePopup(int atIndex)
         items.append(tool);
     }
     
-    QString projectRoot;
-    QProcess gitRootProcess;
-    gitRootProcess.start(QStringLiteral("git"), {QStringLiteral("rev-parse"), QStringLiteral("--show-toplevel")});
-    if (gitRootProcess.waitForFinished(1000) && gitRootProcess.exitCode() == 0) {
-        projectRoot = QString::fromUtf8(gitRootProcess.readAllStandardOutput()).trimmed();
-    }
-    
-    if (projectRoot.isEmpty()) {
-        projectRoot = QDir::current().absolutePath();
-    }
-    
-    QDir projectDir(projectRoot);
+    QDir projectDir = QDir::current();
     if (projectDir.exists()) {
         QStringList files;
-        QProcess gitProcess;
-        gitProcess.setWorkingDirectory(projectDir.absolutePath());
-        
-        gitProcess.start(QStringLiteral("git"), {QStringLiteral("ls-files"), QStringLiteral("--cached"), QStringLiteral("--others"), QStringLiteral("--exclude-standard")});
-        if (gitProcess.waitForFinished(3000) && gitProcess.exitCode() == 0) {
-            QString output = QString::fromUtf8(gitProcess.readAllStandardOutput());
-            QStringList gitFiles = output.split(QChar('\n'), Qt::SkipEmptyParts);
-            gitFiles.sort();
-            for (const QString &gf : gitFiles) {
-                if (!gf.startsWith(QChar('.'))) {
-                    files.append(gf);
-                }
-            }
-        } else {
-            findFilesRecursive(projectDir, QString(), files, 2);
-        }
-        if (files.count() > 200) {
-            files = files.mid(0, 200);
-        }
+        findFilesRecursive(projectDir, "", files, 2);
         items.append(files);
     }
     
@@ -262,28 +293,21 @@ void InputBar::insertFilePath(const QString &filePath)
     }
 }
 
-void InputBar::setRunningState(bool running)
+bool InputBar::eventFilter(QObject *obj, QEvent *event)
 {
-    m_isRunning = running;
-    if (running) {
-        m_sendButton->setText("⬛ Stop");
-        m_inputEdit->setEnabled(false);
-    } else {
-        m_sendButton->setText("Invia");
-        m_inputEdit->setEnabled(true);
-        m_inputEdit->setFocus();
-        m_filePopup->hidePopup();
+    if (obj == m_inputEdit && event->type() == QEvent::KeyPress) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+        if (keyEvent->key() == Qt::Key_Tab) {
+            if (m_agentLoop && m_agentLoop->hasGhostText()) {
+                m_agentLoop->acceptGhostText();
+                return true;
+            }
+        } else if (keyEvent->key() == Qt::Key_Return && keyEvent->modifiers() & Qt::ControlModifier) {
+            onSendClicked();
+            return true;
+        }
     }
-}
-
-void InputBar::onProfileChanged(int index)
-{
-    Q_UNUSED(index)
-    QString profile = m_profileCombo->currentText();
-    AgentProfile profileEnum = stringToProfile(profile);
-    QString prompt = systemPromptForProfile(profileEnum);
-    m_systemPrompt = prompt;
-    emit systemPromptChanged(m_systemPrompt);
+    return QWidget::eventFilter(obj, event);
 }
 
 QSize InputBar::minimumSizeHint() const
@@ -306,23 +330,4 @@ QSize InputBar::sizeHint() const
         totalHeight = min.height();
     }
     return QSize(0, totalHeight);
-}
-
-bool InputBar::eventFilter(QObject *obj, QEvent *event)
-{
-    if (obj == m_inputEdit && event->type() == QEvent::KeyPress) {
-        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
-        if (keyEvent->key() == Qt::Key_Tab) {
-            // Tab pressed - accept ghost text if available
-            if (m_agentLoop && m_agentLoop->hasGhostText()) {
-                m_agentLoop->acceptGhostText();
-                return true; // Event handled
-            }
-        } else if (keyEvent->key() == Qt::Key_Return && keyEvent->modifiers() & Qt::ControlModifier) {
-            // Ctrl+Enter pressed - send message
-            onSendClicked();
-            return true; // Event handled
-        }
-    }
-    return QWidget::eventFilter(obj, event);
 }

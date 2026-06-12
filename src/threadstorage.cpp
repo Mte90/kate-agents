@@ -8,6 +8,7 @@
 ThreadStorage::ThreadStorage(QObject *parent)
     : QObject(parent)
     , m_currentProjectId(QString())
+    , m_storage(nullptr)
 {
 }
 
@@ -26,7 +27,16 @@ bool ThreadStorage::initialize()
 {
     QString threadDir = databasePath();
     QDir().mkpath(threadDir);
+    
+    if (!m_storage) {
+        m_storage = &ThreadJsonStorage::instance();
+    }
     return true;
+}
+
+void ThreadStorage::setStorageBackend(IThreadStorage *storage)
+{
+    m_storage = storage;
 }
 
 void ThreadStorage::setCurrentProjectId(const QString &projectId)
@@ -38,7 +48,12 @@ void ThreadStorage::setCurrentProjectId(const QString &projectId)
 QMap<QString, ConversationThread> ThreadStorage::loadAllThreads()
 {
     QMap<QString, ConversationThread> threads;
-    QStringList threadIds = ThreadJsonStorage::listThreads();
+    
+    if (!m_storage) {
+        m_storage = &ThreadJsonStorage::instance();
+    }
+    
+    QStringList threadIds = m_storage->listThreads();
     
     // Get current project prefix to strip it from loaded IDs
     QString projectId = ThreadJsonStorage::getCurrentProjectId();
@@ -51,7 +66,7 @@ QMap<QString, ConversationThread> ThreadStorage::loadAllThreads()
             threadId = fullThreadId.mid(prefix.length());
         }
         
-        QList<LLMMessage> messages = ThreadJsonStorage::loadThread(fullThreadId);
+        QList<LLMMessage> messages = m_storage->loadThread(fullThreadId);
         
         ConversationThread thread;
         thread.id = threadId;  // Store ID without prefix
@@ -67,13 +82,17 @@ QMap<QString, ConversationThread> ThreadStorage::loadThreadsForProject(const QSt
 {
     QMap<QString, ConversationThread> threads;
     
+    if (!m_storage) {
+        m_storage = &ThreadJsonStorage::instance();
+    }
+    
     QString effectiveProjectId = projectId.isEmpty() ? m_currentProjectId : projectId;
     if (effectiveProjectId.isEmpty()) {
         effectiveProjectId = ThreadJsonStorage::getCurrentProjectId();
     }
     
     QString prefix = ThreadJsonStorage::getProjectPrefix(effectiveProjectId);
-    QStringList fullThreadIds = ThreadJsonStorage::listThreadsForProject(effectiveProjectId);
+    QStringList fullThreadIds = m_storage->listThreadsForProject(effectiveProjectId);
     
     for (const QString &fullThreadId : fullThreadIds) {
         // Strip prefix from thread ID if present
@@ -82,7 +101,7 @@ QMap<QString, ConversationThread> ThreadStorage::loadThreadsForProject(const QSt
             threadId = fullThreadId.mid(prefix.length());
         }
         
-        QList<LLMMessage> messages = ThreadJsonStorage::loadThread(fullThreadId);
+        QList<LLMMessage> messages = m_storage->loadThread(fullThreadId);
         
         ConversationThread thread;
         thread.id = threadId;  // Store ID without prefix
@@ -96,6 +115,10 @@ QMap<QString, ConversationThread> ThreadStorage::loadThreadsForProject(const QSt
 
 bool ThreadStorage::saveThread(const ConversationThread &thread)
 {
+    if (!m_storage) {
+        m_storage = &ThreadJsonStorage::instance();
+    }
+    
     QList<LLMMessage> messages;
     messages.reserve(thread.messages.size());
     
@@ -109,7 +132,7 @@ bool ThreadStorage::saveThread(const ConversationThread &thread)
         messages.append(lmMsg);
     }
     
-    return ThreadJsonStorage::saveThread(thread.id, messages, thread.currentModel, thread.title);
+    return m_storage->saveThread(thread.id, messages, thread.currentModel, thread.title);
 }
 
 bool ThreadStorage::saveAllThreads(const QMap<QString, ConversationThread> &threads)
@@ -124,5 +147,9 @@ bool ThreadStorage::saveAllThreads(const QMap<QString, ConversationThread> &thre
 
 bool ThreadStorage::deleteThread(const QString &threadId)
 {
-    return ThreadJsonStorage::deleteThread(threadId);
+    if (!m_storage) {
+        m_storage = &ThreadJsonStorage::instance();
+    }
+    
+    return m_storage->deleteThread(threadId);
 }

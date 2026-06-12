@@ -262,3 +262,11 @@ target_link_libraries(test_integration
 )
 target_include_directories(test_integration PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME test_integration COMMAND test_integration)
+
+# Streaming chunk tests (pipe separator removal)
+add_executable(test_streaming_chunk test_streaming_chunk.cpp)
+target_link_libraries(test_streaming_chunk
+    Qt6::Test
+    Qt6::Core
+)
+add_test(NAME test_streaming_chunk COMMAND test_streaming_chunk)

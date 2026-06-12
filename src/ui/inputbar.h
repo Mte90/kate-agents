@@ -9,6 +9,8 @@
 #include <QComboBox>
 #include <QString>
 #include <QDir>
+#include <QLabel>
+#include <QTimer>
 
 class FileMentionPopup;
 class AgentLoop;
@@ -46,26 +48,34 @@ signals:
     void stopRequested();
     void modelChanged(const QString &model);
     void systemPromptChanged(const QString &prompt);
+    void retryRequested();
 
 private slots:
     void onSendClicked();
     void onReturnPressed();
     void onTextChanged();
-    void insertFilePath(const QString &filePath);
     void onProfileChanged(int index);
+    void updateLoadingIndicator();
 
 private:
     bool eventFilter(QObject *obj, QEvent *event) override;
     void showAutocompletePopup(int atIndex);
     void findFilesRecursive(const QDir &dir, const QString &prefix, QStringList &result, int depth);
+    void insertFilePath(const QString &filePath);
+    void showErrorWithRetry(const QString &error);
     
     QTextEdit *m_inputEdit;
     QPushButton *m_sendButton;
+    QPushButton *m_retryButton;
     QComboBox *m_modelCombo;
     QComboBox *m_profileCombo;
     FileMentionPopup *m_filePopup = nullptr;
     AgentLoop *m_agentLoop = nullptr;
-    bool m_isRunning = false;
+    QLabel *m_loadingIndicator;
+    QTimer *m_loadingTimer;
+    bool m_isRunning;
+    int m_loadingDotCount;
+    bool m_retryVisible;
     QString m_systemPrompt;
     QStringList m_availableTools = {"edit_file", "grep", "terminal", "web_search", "url_fetch", "diagnostics", "find_path", "list_directory", "create_directory"};
 };

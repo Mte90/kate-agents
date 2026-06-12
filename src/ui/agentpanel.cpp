@@ -49,6 +49,14 @@ AgentPanel::AgentPanel(AgentLoop *agent, ToolRegistry *registry,
 
 AgentPanel::~AgentPanel() = default;
 
+void AgentPanel::cacheTabs()
+{
+    m_tabHash.clear();
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        m_tabHash.insert(m_tabs->tabToolTip(i), i);
+    }
+}
+
 void AgentPanel::setupUi()
 {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
@@ -82,7 +90,7 @@ void AgentPanel::setupUi()
     QPushButton *newChatBtn = new QPushButton("+");
     newChatBtn->setFixedSize(24, 24);
     newChatBtn->setToolTip(i18n("New Chat"));
-    newChatBtn->setStyleSheet("QPushButton { font-weight: bold; font-size: 16px; }");
+    newChatBtn->setObjectName("agentNewChatButton");
     connect(newChatBtn, &QPushButton::clicked, this, &AgentPanel::onNewChat);
     newChatLayout->addStretch();
     
@@ -175,7 +183,7 @@ void AgentPanel::createNewChatTab()
     ThreadView *threadView = new ThreadView(m_tabs);
     int index = m_tabs->addTab(threadView, title);
     m_tabs->setTabToolTip(index, threadId);
-    
+    cacheTabs();
     connect(threadView, &ThreadView::deleteMessageRequested, this, &AgentPanel::onDeleteMessage);
     
     m_tabs->setCurrentIndex(index);
@@ -214,6 +222,7 @@ void AgentPanel::closeChatTab(int index)
     } else {
         createNewChatTab();
     }
+    cacheTabs();
     
 }
 
@@ -334,7 +343,7 @@ void AgentPanel::loadExistingThreads()
         m_tabs->setCurrentIndex(0);
         m_currentThreadId = m_tabs->tabToolTip(0);
     }
-    
+    cacheTabs();
 }
 
 QString AgentPanel::generateChatTitle(int chatNumber)
@@ -490,36 +499,26 @@ void AgentPanel::onResponseStarted()
     if (m_activeThreadId.isEmpty()) {
         return;
     }
-    
-    for (int i = 0; i < m_tabs->count(); ++i) {
-        QString tabThreadId = m_tabs->tabToolTip(i);
-        if (tabThreadId == m_activeThreadId) {
-            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
-            if (threadView) {
-                threadView->resetStreaming();
-            }
-            break;
+    int index = m_tabHash.value(m_activeThreadId, -1);
+    if (index >= 0) {
+        ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(index));
+        if (threadView) {
+            threadView->resetStreaming();
         }
     }
 }
 
 void AgentPanel::onResponseChunk(const QString &chunk)
 {
-    // Find the tab for the active thread (not just currentIndex)
     if (m_activeThreadId.isEmpty()) {
         return;
     }
-    
-    
-    for (int i = 0; i < m_tabs->count(); ++i) {
-        QString tabThreadId = m_tabs->tabToolTip(i);
-        if (tabThreadId == m_activeThreadId) {
-            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
-            if (threadView) {
-                threadView->showStreamingChunk(chunk);
-                m_hasUnsavedChanges = true;
-            }
-            break;
+    int index = m_tabHash.value(m_activeThreadId, -1);
+    if (index >= 0) {
+        ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(index));
+        if (threadView) {
+            threadView->showStreamingChunk(chunk);
+            m_hasUnsavedChanges = true;
         }
     }
 }
@@ -529,15 +528,11 @@ void AgentPanel::onToolCallStarted(const QString &toolName, const QJsonObject &a
     if (m_activeThreadId.isEmpty()) {
         return;
     }
-    
-    for (int i = 0; i < m_tabs->count(); ++i) {
-        QString tabThreadId = m_tabs->tabToolTip(i);
-        if (tabThreadId == m_activeThreadId) {
-            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
-            if (threadView) {
-                threadView->appendToolCall(toolName, args);
-            }
-            break;
+    int index = m_tabHash.value(m_activeThreadId, -1);
+    if (index >= 0) {
+        ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(index));
+        if (threadView) {
+            threadView->appendToolCall(toolName, args);
         }
     }
 }
@@ -547,15 +542,11 @@ void AgentPanel::onToolCallCompleted(const QString &toolName, const QJsonObject 
     if (m_activeThreadId.isEmpty()) {
         return;
     }
-    
-    for (int i = 0; i < m_tabs->count(); ++i) {
-        QString tabThreadId = m_tabs->tabToolTip(i);
-        if (tabThreadId == m_activeThreadId) {
-            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
-            if (threadView) {
-                threadView->appendToolResult(toolName, result);
-            }
-            break;
+    int index = m_tabHash.value(m_activeThreadId, -1);
+    if (index >= 0) {
+        ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(index));
+        if (threadView) {
+            threadView->appendToolResult(toolName, result);
         }
     }
 }
@@ -581,17 +572,15 @@ void AgentPanel::onTurnCompleted()
         }
     }
     
-    for (int i = 0; i < m_tabs->count(); ++i) {
-        if (m_tabs->tabToolTip(i) == m_activeThreadId) {
-            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
-            if (threadView) {
-                if (!thinking.isEmpty()) {
-                    threadView->appendAssistantMessage(content, thinking);
-                } else {
-                    threadView->endStreaming();
-                }
+    int index = m_tabHash.value(m_activeThreadId, -1);
+    if (index >= 0) {
+        ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(index));
+        if (threadView) {
+            if (!thinking.isEmpty()) {
+                threadView->appendAssistantMessage(content, thinking);
+            } else {
+                threadView->endStreaming();
             }
-            break;
         }
     }
     
@@ -612,19 +601,16 @@ void AgentPanel::onTitleGenerated(const QString &threadId, const QString &title)
 {
     m_pendingTitleTabs.remove(threadId);
 
-    // Find the tab for this thread and update its title
-    for (int i = 0; i < m_tabs->count(); ++i) {
-        if (m_tabs->tabToolTip(i) == threadId) {
-            updateTabTitle(i, title);
-            // Update thread title in persistent storage
-            if (m_threadStorage) {
-                QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
-                if (threads.contains(threadId)) {
-                    threads[threadId].title = title;
-                    m_threadStorage->saveThread(threads[threadId]);
-                }
+    int index = m_tabHash.value(threadId, -1);
+    if (index >= 0) {
+        updateTabTitle(index, title);
+        // Update thread title in persistent storage
+        if (m_threadStorage) {
+            QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
+            if (threads.contains(threadId)) {
+                threads[threadId].title = title;
+                m_threadStorage->saveThread(threads[threadId]);
             }
-            break;
         }
     }
 }
@@ -691,28 +677,19 @@ void AgentPanel::reloadModels()
 
 void AgentPanel::onThreadUpdated(const QString &threadId)
 {
-    // Load the thread from storage and render it
     if (!m_threadStorage || threadId.isEmpty()) {
         return;
     }
-    
     QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
     if (!threads.contains(threadId)) {
         return;
     }
-    
     ConversationThread thread = threads[threadId];
-    
-    // Find the tab for this thread
-    for (int i = 0; i < m_tabs->count(); ++i) {
-        if (m_tabs->tabToolTip(i) == threadId) {
-            ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(i));
-            if (threadView) {
-                threadView->renderThread(thread.messages);
-            } else {
-            }
-            break;
-        } else if (i == m_tabs->count() - 1) {
+    int index = m_tabHash.value(threadId, -1);
+    if (index >= 0) {
+        ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(index));
+        if (threadView) {
+            threadView->renderThread(thread.messages);
         }
     }
 }

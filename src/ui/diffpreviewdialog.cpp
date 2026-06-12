@@ -38,7 +38,7 @@ void DiffPreviewDialog::setupUi()
     m_mainLayout->setSpacing(10);
 
     m_headerLabel = new QLabel();
-    m_headerLabel->setStyleSheet("font-weight: bold; padding: 5px; background: #f0f0f0; border-radius: 3px;");
+    m_headerLabel->setObjectName("diffPreviewHeader");
     m_headerLabel->setText(QString("Original: %1 lines").arg(m_originalLines.count('\n') + 1));
     m_mainLayout->addWidget(m_headerLabel);
 
@@ -65,13 +65,13 @@ void DiffPreviewDialog::setupUi()
     m_buttonsLayout->addStretch();
 
     m_acceptButton = new QPushButton("Accept ✓");
-    m_acceptButton->setStyleSheet("QPushButton { background: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; }");
+    m_acceptButton->setObjectName("diffActionButton");
 
     m_rejectButton = new QPushButton("Reject");
-    m_rejectButton->setStyleSheet("QPushButton { background: #f44336; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; }");
+    m_rejectButton->setObjectName("diffActionButton");
 
     m_acceptAllButton = new QPushButton("Accept All");
-    m_acceptAllButton->setStyleSheet("QPushButton { background: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; }");
+    m_acceptAllButton->setObjectName("diffActionButton");
 
     m_buttonsLayout->addWidget(m_acceptButton);
     m_buttonsLayout->addWidget(m_rejectButton, 1);

@@ -8,6 +8,8 @@
 #include <QTabBar>
 #include <QAction>
 #include <QSet>
+#include <QHash>
+#include <QHash>
 #include <QMouseEvent>
 
 #include "threadview.h"
@@ -124,6 +126,7 @@ private:
     void saveCurrentThread();
     void loadExistingThreads();
     QString generateChatTitle(int chatNumber);
+    void cacheTabs();
     
     // Member variables (order must match constructor initialization list)
     AgentLoop *m_agent;
@@ -139,6 +142,7 @@ private:
     QString m_currentThreadId;
     bool m_hasUnsavedChanges = false;  // Track if current thread has unsaved changes
     QSet<QString> m_pendingTitleTabs;  // Tabs awaiting LLM title generation
+    QHash<QString, int> m_tabHash;  // threadId → tab index for O(1) lookups
 };
 
 #endif

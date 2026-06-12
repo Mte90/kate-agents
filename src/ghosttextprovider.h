@@ -22,7 +22,7 @@ class GhostTextProvider : public KTextEditor::InlineNoteProvider
     Q_OBJECT
 
 public:
-    explicit GhostTextProvider(QObject *parent = nullptr) { Q_UNUSED(parent); }
+    explicit GhostTextProvider(QObject *parent = nullptr) : KTextEditor::InlineNoteProvider() { Q_UNUSED(parent); }
     ~GhostTextProvider() override = default;
 
     /**

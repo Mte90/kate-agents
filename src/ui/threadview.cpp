@@ -264,16 +264,19 @@ void ThreadView::appendToolResult(const QString &toolName, const QJsonObject &re
 
 void ThreadView::showStreamingChunk(const QString &chunk)
 {
+    // Remove pipe separators if present (fix for tokenized stream)
+    QString cleanChunk = chunk;
+    cleanChunk.remove("|");
+    
     bool isFirst = m_streamingContent.isEmpty();
-    m_streamingContent += chunk;
+    m_streamingContent += cleanChunk;
     
     QTextCursor cursor = textCursor();
     cursor.movePosition(QTextCursor::End);
     
-    // Remove the previous cursor character before inserting new content
     if (cursor.position() > 0 && !isFirst) {
         QTextCursor removeCursor = cursor;
-        removeCursor.movePosition(QTextCursor::PreviousCharacter, QTextCursor::KeepAnchor);
+        removeCursor.movePosition(QTextCursor::PreviousCharacter, QTextCursor::MoveAnchor);
         if (removeCursor.selectedText() == QStringLiteral("|")) {
             removeCursor.removeSelectedText();
         }
@@ -287,17 +290,15 @@ void ThreadView::showStreamingChunk(const QString &chunk)
         }
         insertHtml("<div style='white-space: pre-wrap; word-break: break-word;'>");
         m_streamingStartPosition = textCursor().position();
-    }
-    
-    textCursor().insertText(chunk);
-    
-    insertHtml("<span class='cursor'>|</span>");
-    scrollToBottom();
-    
-    if (m_streamingContent.length() == chunk.length()) {
+        // Start cursor blinking on first chunk to avoid indefinite waiting
         m_cursorBlinkCount = 0;
         m_cursorTimer->start();
     }
+    
+    textCursor().insertText(cleanChunk);
+    
+    insertHtml("<span class='cursor'>|</span>");
+    scrollToBottom();
 }
 
 void ThreadView::resetStreaming()
@@ -317,7 +318,7 @@ void ThreadView::endStreaming()
         QTextCursor cursor = textCursor();
         cursor.movePosition(QTextCursor::End);
         cursor.setPosition(m_streamingStartPosition);
-        cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
+        cursor.movePosition(QTextCursor::End, QTextCursor::MoveAnchor);
         cursor.removeSelectedText();
         
         QString markdownHtml = parseMarkdown(streamingContent);

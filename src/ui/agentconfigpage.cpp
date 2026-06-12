@@ -59,7 +59,7 @@ AgentConfigPage::AgentConfigPage(QWidget *parent, KateAgentPlugin *plugin)
         // Info label
         auto *infoLabel = new QLabel(i18n("ℹ️ The model list is fetched from the OpenAI provider at the Base URL above."));
         infoLabel->setWordWrap(true);
-        infoLabel->setStyleSheet("color: #666; font-style: italic; margin-left: 10px;");
+        infoLabel->setObjectName("agentConfigInfoLabel");
         layout->addWidget(infoLabel);
     }
     
@@ -204,7 +204,9 @@ void AgentConfigPage::defaults()
 {
     m_apiKeyEdit->setText("");
     m_baseUrlEdit->setText("http://localhost:11434/v1");
-    m_modelComboBox->setCurrentIndex(0);
+    if (m_modelComboBox->count() > 0) {
+        m_modelComboBox->setCurrentIndex(0);
+    }
     m_systemPromptEdit->setPlainText("You are a helpful coding assistant. Provide concise, accurate code and explanations.");
 }
 

@@ -1,5 +1,6 @@
 #include <QtTest/QtTest>
 #include "../src/threadjson.h"
+#include "../src/ithreadstorage.h"
 #include <QFile>
 #include <QDir>
 #include <QTemporaryDir>
@@ -10,19 +11,21 @@ class TestThreadJsonAdvanced : public QObject
 
 private:
     QString m_testProjectId;
+    IThreadStorage* m_storage;
 
 private slots:
     void initTestCase()
     {
         m_testProjectId = QStringLiteral("test-kate-agent-%1").arg(QDateTime::currentMSecsSinceEpoch());
         ThreadJsonStorage::setCurrentProjectId(m_testProjectId);
+        m_storage = &ThreadJsonStorage::instance();
     }
 
     void cleanup()
     {
-        QStringList threads = ThreadJsonStorage::listThreads();
+        QStringList threads = m_storage->listThreads();
         for (const QString &id : threads) {
-            ThreadJsonStorage::deleteThread(id);
+            m_storage->deleteThread(id);
         }
     }
 
@@ -87,9 +90,9 @@ private slots:
         messages.append({QStringLiteral("user"), QStringLiteral("Hello"), QString(), QString(), QString()});
         messages.append({QStringLiteral("assistant"), QStringLiteral("Hi there!"), QString(), QString(), QString()});
 
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, messages));
+        QVERIFY(m_storage->saveThread(threadId, messages));
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded.size(), 2);
         QCOMPARE(loaded[0].role, QStringLiteral("user"));
         QCOMPARE(loaded[0].content, QStringLiteral("Hello"));
@@ -102,9 +105,9 @@ private slots:
         QString threadId = QStringLiteral("empty-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> messages;
 
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, messages));
+        QVERIFY(m_storage->saveThread(threadId, messages));
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded.size(), 0);
     }
 
@@ -115,9 +118,9 @@ private slots:
         messages.append({QStringLiteral("user"), QStringLiteral("content"), QStringLiteral("Write"), QString(), QString()});
         messages.append({QStringLiteral("tool"), QStringLiteral("result"), QString(), QStringLiteral("call_123"), QString()});
 
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, messages));
+        QVERIFY(m_storage->saveThread(threadId, messages));
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded.size(), 2);
         QCOMPARE(loaded[0].profile, QStringLiteral("Write"));
         QCOMPARE(loaded[1].toolCallId, QStringLiteral("call_123"));
@@ -130,17 +133,17 @@ private slots:
         QList<LLMMessage> msgs;
         msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
 
-        QVERIFY(ThreadJsonStorage::saveThread(id1, msgs));
-        QVERIFY(ThreadJsonStorage::saveThread(id2, msgs));
+        QVERIFY(m_storage->saveThread(id1, msgs));
+        QVERIFY(m_storage->saveThread(id2, msgs));
 
-        QStringList threads = ThreadJsonStorage::listThreads();
+        QStringList threads = m_storage->listThreads();
         QVERIFY(threads.contains(id1));
         QVERIFY(threads.contains(id2));
     }
 
     void testLoadNonExistentThread()
     {
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread("nonexistent-thread-xyz");
+        QList<LLMMessage> loaded = m_storage->loadThread("nonexistent-thread-xyz");
         QCOMPARE(loaded.size(), 0);
     }
 
@@ -150,8 +153,8 @@ private slots:
         QList<LLMMessage> msgs;
         msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
 
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs, QString(), "My Test Title"));
-        QCOMPARE(ThreadJsonStorage::loadThreadTitle(threadId), QStringLiteral("My Test Title"));
+        QVERIFY(m_storage->saveThread(threadId, msgs, QString(), "My Test Title"));
+        QCOMPARE(m_storage->loadThreadTitle(threadId), QStringLiteral("My Test Title"));
     }
 
     void testLoadThreadTitleMissing()
@@ -160,8 +163,8 @@ private slots:
         QList<LLMMessage> msgs;
         msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
 
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
-        QVERIFY(ThreadJsonStorage::loadThreadTitle(threadId).isEmpty());
+        QVERIFY(m_storage->saveThread(threadId, msgs));
+        QVERIFY(m_storage->loadThreadTitle(threadId).isEmpty());
     }
 
     void testDeleteThread()
@@ -170,16 +173,16 @@ private slots:
         QList<LLMMessage> msgs;
         msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
 
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
-        QVERIFY(ThreadJsonStorage::deleteThread(threadId));
+        QVERIFY(m_storage->saveThread(threadId, msgs));
+        QVERIFY(m_storage->deleteThread(threadId));
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded.size(), 0);
     }
 
     void testDeleteNonExistentThread()
     {
-        QVERIFY(!ThreadJsonStorage::deleteThread("nonexistent-del-xyz"));
+        QVERIFY(!m_storage->deleteThread("nonexistent-del-xyz"));
     }
 
     void testDeleteThenSave()
@@ -187,15 +190,15 @@ private slots:
         QString threadId = QStringLiteral("delresave-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs1;
         msgs1.append({QStringLiteral("user"), QStringLiteral("first"), QString(), QString(), QString()});
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs1));
+        QVERIFY(m_storage->saveThread(threadId, msgs1));
 
-        QVERIFY(ThreadJsonStorage::deleteThread(threadId));
+        QVERIFY(m_storage->deleteThread(threadId));
 
         QList<LLMMessage> msgs2;
         msgs2.append({QStringLiteral("user"), QStringLiteral("second"), QString(), QString(), QString()});
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs2));
+        QVERIFY(m_storage->saveThread(threadId, msgs2));
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded.size(), 1);
         QCOMPARE(loaded[0].content, QStringLiteral("second"));
     }
@@ -205,13 +208,13 @@ private slots:
         QString threadId = QStringLiteral("overwrite-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs1;
         msgs1.append({QStringLiteral("user"), QStringLiteral("version1"), QString(), QString(), QString()});
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs1));
+        QVERIFY(m_storage->saveThread(threadId, msgs1));
 
         QList<LLMMessage> msgs2;
         msgs2.append({QStringLiteral("user"), QStringLiteral("version2"), QString(), QString(), QString()});
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs2));
+        QVERIFY(m_storage->saveThread(threadId, msgs2));
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded.size(), 1);
         QCOMPARE(loaded[0].content, QStringLiteral("version2"));
     }
@@ -230,7 +233,7 @@ private slots:
             file.close();
         }
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread("any-thread");
+        QList<LLMMessage> loaded = m_storage->loadThread("any-thread");
         QCOMPARE(loaded.size(), 0);
 
         if (QFile::exists(backupPath)) {
@@ -252,7 +255,7 @@ private slots:
             file.close();
         }
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread("any-thread");
+        QList<LLMMessage> loaded = m_storage->loadThread("any-thread");
         QCOMPARE(loaded.size(), 0);
 
         if (QFile::exists(backupPath)) {
@@ -272,16 +275,16 @@ private slots:
         msgsA.append({QStringLiteral("user"), QStringLiteral("project A message"), QString(), QString(), QString()});
 
         ThreadJsonStorage::setCurrentProjectId(projA);
-        QVERIFY(ThreadJsonStorage::saveThread(threadIdA, msgsA));
+        QVERIFY(m_storage->saveThread(threadIdA, msgsA));
 
         ThreadJsonStorage::setCurrentProjectId(projB);
-        QStringList threadsB = ThreadJsonStorage::listThreads();
+        QStringList threadsB = m_storage->listThreads();
         QVERIFY(!threadsB.contains(threadIdA));
 
         ThreadJsonStorage::setCurrentProjectId(projA);
-        QStringList threadsA = ThreadJsonStorage::listThreads();
+        QStringList threadsA = m_storage->listThreads();
         QVERIFY(threadsA.contains(threadIdA));
-        ThreadJsonStorage::deleteThread(threadIdA);
+        m_storage->deleteThread(threadIdA);
 
         ThreadJsonStorage::setCurrentProjectId(m_testProjectId);
     }
@@ -292,9 +295,9 @@ private slots:
         QList<LLMMessage> msgs;
         msgs.append({QStringLiteral("user"), QString(50000, QChar('x')), QString(), QString(), QString()});
 
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
+        QVERIFY(m_storage->saveThread(threadId, msgs));
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded.size(), 1);
         QCOMPARE(loaded[0].content.size(), 50000);
     }
@@ -305,9 +308,9 @@ private slots:
         QList<LLMMessage> msgs;
         msgs.append({QStringLiteral("user"), QStringLiteral("こんにちは世界 🌍 Привет"), QString(), QString(), QString()});
 
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
+        QVERIFY(m_storage->saveThread(threadId, msgs));
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded[0].content, QStringLiteral("こんにちは世界 🌍 Привет"));
     }
 
@@ -319,12 +322,12 @@ private slots:
         QString threadId = QStringLiteral("list-thread-%1").arg(QDateTime::currentMSecsSinceEpoch());
         QList<LLMMessage> msgs;
         msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
+        QVERIFY(m_storage->saveThread(threadId, msgs));
 
-        QStringList threads = ThreadJsonStorage::listThreadsForProject(projId);
+        QStringList threads = m_storage->listThreadsForProject(projId);
         QVERIFY(threads.contains(threadId));
 
-        ThreadJsonStorage::deleteThread(threadId);
+        m_storage->deleteThread(threadId);
         ThreadJsonStorage::setCurrentProjectId(m_testProjectId);
     }
 
@@ -334,9 +337,9 @@ private slots:
         QList<LLMMessage> msgs;
         msgs.append({QStringLiteral("user"), QStringLiteral("test"), QString(), QString(), QString()});
 
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs, "gpt-4"));
+        QVERIFY(m_storage->saveThread(threadId, msgs, "gpt-4"));
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded.size(), 1);
     }
 
@@ -349,9 +352,9 @@ private slots:
             msgs.append({QStringLiteral("assistant"), QStringLiteral("resp %1").arg(i), QString(), QString(), QString()});
         }
 
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
+        QVERIFY(m_storage->saveThread(threadId, msgs));
 
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded.size(), 200);
         QCOMPARE(loaded[0].content, QStringLiteral("msg 0"));
         QCOMPARE(loaded[199].content, QStringLiteral("resp 99"));
@@ -366,20 +369,20 @@ private slots:
         ThreadJsonStorage::setCurrentProjectId(projectA);
         QList<LLMMessage> msgs;
         msgs.append({QStringLiteral("user"), QStringLiteral("cross-project test"), QString(), QString(), QString()});
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
+        QVERIFY(m_storage->saveThread(threadId, msgs));
 
-        QStringList threadsInA = ThreadJsonStorage::listThreads();
+        QStringList threadsInA = m_storage->listThreads();
         QVERIFY(threadsInA.contains(threadId));
 
         ThreadJsonStorage::setCurrentProjectId(projectB);
-        QStringList threadsInB = ThreadJsonStorage::listThreads();
+        QStringList threadsInB = m_storage->listThreads();
         QVERIFY(!threadsInB.contains(threadId));
 
-        bool deleted = ThreadJsonStorage::deleteThread(threadId);
+        bool deleted = m_storage->deleteThread(threadId);
         QVERIFY2(deleted, "deleteThread should find and delete the thread from project A's file");
 
         ThreadJsonStorage::setCurrentProjectId(projectA);
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded.size(), 0);
 
         QFile::remove(ThreadJsonStorage::getThreadFilePath(projectA));
@@ -395,18 +398,18 @@ private slots:
         ThreadJsonStorage::setCurrentProjectId(projectA);
         QList<LLMMessage> msgs;
         msgs.append({QStringLiteral("user"), QStringLiteral("thread in A"), QString(), QString(), QString()});
-        QVERIFY(ThreadJsonStorage::saveThread(threadId, msgs));
+        QVERIFY(m_storage->saveThread(threadId, msgs));
 
         ThreadJsonStorage::setCurrentProjectId(projectB);
 
-        QStringList threadsInB = ThreadJsonStorage::listThreads();
+        QStringList threadsInB = m_storage->listThreads();
         QVERIFY(!threadsInB.contains(threadId));
 
-        bool deleted = ThreadJsonStorage::deleteThread(threadId);
+        bool deleted = m_storage->deleteThread(threadId);
         QVERIFY2(deleted, "deleteThread should find and delete the thread from project A's file via fallback");
 
         ThreadJsonStorage::setCurrentProjectId(projectA);
-        QList<LLMMessage> loaded = ThreadJsonStorage::loadThread(threadId);
+        QList<LLMMessage> loaded = m_storage->loadThread(threadId);
         QCOMPARE(loaded.size(), 0);
 
         QFile::remove(ThreadJsonStorage::getThreadFilePath(projectA));

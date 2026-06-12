@@ -77,6 +77,7 @@ private:
     void updateProjectIdFromCurrentFile();
     
     QMutex m_iterationMutex;
+    QMutex m_threadsMutex;
 
     LLMProvider *m_provider = nullptr;
     ToolRegistry *m_registry = nullptr;

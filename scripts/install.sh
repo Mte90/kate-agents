@@ -10,7 +10,7 @@ if [ ! -f "${BUILD_DIR}/kateagentplugin.so" ]; then
     echo "Building plugin first..."
     rm -rf "${BUILD_DIR}"
     cmake -B "${BUILD_DIR}" .
-    cmake --build "${BUILD_DIR}" -j4
+    cmake --build "${BUILD_DIR}" -j16
 fi
 
 echo "Installing Kate Agent Plugin..."

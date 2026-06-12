@@ -38,6 +38,32 @@ private slots:
         QVERIFY(popup.m_selectedIndex == 5);
     }
 
+    void testShowAtScreenBoundaries()
+    {
+        FileMentionPopup popup;
+        popup.setFixedSize(200, 300);
+        
+        // Mock screen size to 1920x1080
+        // Since we can't easily mock QGuiApplication::primaryScreen(),
+        // we verify that showAt doesn't crash and handles extreme coordinates.
+        
+        // Case 1: Top-left corner
+        popup.showAt(QPoint(0, 0));
+        QVERIFY(popup.x() >= 0 && popup.y() >= 0);
+        
+        // Case 2: Extreme bottom-right (should be clamped)
+        popup.showAt(QPoint(5000, 5000));
+        QVERIFY(popup.x() < 5000); 
+        QVERIFY(popup.y() < 5000);
+        
+        // Case 3: Position that would overflow bottom (should flip to top)
+        // We can't perfectly predict the screen height here, but we verify 
+        // that the coordinates are adjusted from the requested ones.
+        QPoint requestedPos(100, 10000);
+        popup.showAt(requestedPos);
+        QVERIFY(popup.y() != requestedPos.y());
+    }
+
     void testMaxDepthDefault()
     {
         FileMentionPopup popup;

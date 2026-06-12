@@ -76,6 +76,36 @@ private slots:
         panel.m_models << "gpt-4" << "claude-3" << "llama-3";
         QVERIFY(panel.m_models.size() == 3);
     }
+
+    void testTabHashConsistency()
+    {
+        AgentPanel panel(nullptr, nullptr, nullptr, nullptr, nullptr);
+        
+        // Create several threads
+        QString id1 = panel.createNewThread();
+        QString id2 = panel.createNewThread();
+        QString id3 = panel.createNewThread();
+        
+        // Verify hash is populated
+        QVERIFY(panel.m_tabHash.contains(id1));
+        QVERIFY(panel.m_tabHash.contains(id2));
+        QVERIFY(panel.m_tabHash.contains(id3));
+        
+        // Verify correct indices (0, 1, 2)
+        QCOMPARE(panel.m_tabHash.value(id1), 0);
+        QCOMPARE(panel.m_tabHash.value(id2), 1);
+        QCOMPARE(panel.m_tabHash.value(id3), 2);
+        
+        // Close middle tab and verify re-indexing
+        panel.closeChatTab(1); // Close id2
+        
+        QVERIFY(!panel.m_tabHash.contains(id2));
+        QVERIFY(panel.m_tabHash.contains(id1));
+        QVERIFY(panel.m_tabHash.contains(id3));
+        
+        // id3 should now be at index 1
+        QCOMPARE(panel.m_tabHash.value(id3), 1);
+    }
 };
 
 QTEST_MAIN(TestAgentPanelUI)

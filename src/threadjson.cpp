@@ -4,13 +4,18 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QJsonDocument>
 #include <QStandardPaths>
 #include <QDebug>
 #include <QProcess>
 
 // Static member initialization
 QString ThreadJsonStorage::s_currentProjectId;
+
+ThreadJsonStorage &ThreadJsonStorage::instance()
+{
+    static ThreadJsonStorage instance;
+    return instance;
+}
 
 QString ThreadJsonStorage::getThreadDir()
 {
@@ -69,7 +74,6 @@ static QJsonObject loadThreadsFile(const QString &projectId)
     }
     
     if (!file.open(QIODevice::ReadOnly)) {
-        // Failed to open threads file for reading: << filePath
         return QJsonObject();
     }
     

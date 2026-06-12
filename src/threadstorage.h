@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "llmprovider.h"
+#include "ithreadstorage.h"
 
 class ThreadStorage : public QObject
 {
@@ -24,9 +25,12 @@ public:
     bool deleteThread(const QString &threadId);
     void setCurrentProjectId(const QString &projectId);
 
+    void setStorageBackend(IThreadStorage *storage);
+
 private:
     QString databasePath() const;
     QString m_currentProjectId;
+    IThreadStorage *m_storage;
 };
 
 #endif // THREADSTORAGE_H
