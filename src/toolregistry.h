@@ -3,6 +3,7 @@
 
 #include "llmprovider.h"
 #include "permissionmanager.h"
+#include "auditlogger.h"
 #include <QObject>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -56,6 +57,10 @@ public:
     bool requiresPermission(const QString &name) const;
     
     void setPermissionManager(PermissionManager *manager) { m_permissionManager = manager; }
+    void setAuditLogger(AuditLogger *logger) { m_auditLogger = logger; }
+    
+    void setCurrentThreadId(const QString &threadId) { if (m_auditLogger) m_auditLogger->setThreadId(threadId); }
+    void setCurrentProjectId(const QString &projectId) { if (m_auditLogger) m_auditLogger->setProjectId(projectId); }
 
 signals:
     void toolRegistered(const QString &name);
@@ -64,6 +69,7 @@ signals:
 private:
     QMap<QString, AgentTool*> m_tools;
     PermissionManager *m_permissionManager = nullptr;
+    AuditLogger *m_auditLogger = nullptr;
 };
 
 #endif

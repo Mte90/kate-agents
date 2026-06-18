@@ -644,7 +644,7 @@ void AgentPanel::onPermissionRequested(const QString &toolName)
     
     QPushButton* allowBtn = msgBox.addButton(tr("Allow (once)"), QMessageBox::ActionRole);
     QPushButton* alwaysBtn = msgBox.addButton(tr("Always Allow"), QMessageBox::ActionRole);
-    msgBox.addButton(tr("Deny"), QMessageBox::RejectRole);
+    QPushButton* denyBtn = msgBox.addButton(tr("Deny"), QMessageBox::RejectRole);
     
     msgBox.exec();
     
@@ -653,8 +653,10 @@ void AgentPanel::onPermissionRequested(const QString &toolName)
     } else if (msgBox.clickedButton() == alwaysBtn) {
         m_permissions->grantPermission(toolName);
         m_permissions->setToolPolicy(toolName, PermissionPolicy::Allow);
+    } else if (msgBox.clickedButton() == denyBtn) {
+        m_permissions->denyPermission(toolName);
     }
-    // If denyBtn was clicked or dialog closed, do nothing (permission denied by default)
+    // If dialog closed without button click (ESC), deny permission
 }
 
 void AgentPanel::reloadModels()

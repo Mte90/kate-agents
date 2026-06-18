@@ -137,6 +137,23 @@ void ConfigManager::save()
     
     file.write(QJsonDocument(obj).toJson());
     file.close();
+    
+    // Also sync to KConfig to keep both storage backends in sync
+    KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
+    if (!m_providers.empty()) {
+        for (const auto &p : m_providers) {
+            if (p.name == m_activeProvider) {
+                group.writeEntry("BaseUrl", p.baseUrl);
+                group.writeEntry("ApiKey", p.apiKey);
+                group.writeEntry("Model", p.defaultModel);
+                break;
+            }
+        }
+    }
+    group.writeEntry("Model", m_activeModel);
+    group.writeEntry("SystemPrompt", m_systemPrompt);
+    group.writeEntry("BufferContextEnabled", m_bufferContextEnabled);
+    group.sync();
 }
 
 ProviderConfig ConfigManager::getProviderConfig(const QString &name) const

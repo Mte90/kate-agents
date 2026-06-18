@@ -182,6 +182,7 @@ add_executable(test_agentloop test_agentloop.cpp
     ../src/threadjson.cpp
     ../src/ghosttextprovider.cpp
     ../src/editorcontext.cpp
+    ../src/auditlogger.cpp
 )
 set_target_properties(test_agentloop PROPERTIES AUTOMOC ON)
 target_link_libraries(test_agentloop
@@ -248,6 +249,7 @@ add_executable(test_integration test_integration.cpp
     ../src/threadjson.cpp
     ../src/ghosttextprovider.cpp
     ../src/editorcontext.cpp
+    ../src/auditlogger.cpp
 )
 set_target_properties(test_integration PROPERTIES AUTOMOC ON)
 target_link_libraries(test_integration

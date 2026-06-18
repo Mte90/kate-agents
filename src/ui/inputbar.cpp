@@ -26,7 +26,7 @@ InputBar::InputBar(QWidget *parent)
     
 
     m_inputEdit = new QTextEdit(this);
-    m_inputEdit->setPlaceholderText(i18n("Type a message... (@ for tools)"));
+    m_inputEdit->setPlaceholderText(i18n("Type a message... (@ for files)"));
     m_inputEdit->setAcceptRichText(false);
     m_inputEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     m_inputEdit->setFrameStyle(QFrame::StyledPanel | QFrame::Plain);
@@ -312,7 +312,7 @@ bool InputBar::eventFilter(QObject *obj, QEvent *event)
 
 QSize InputBar::minimumSizeHint() const
 {
-    int editMinHeight = m_inputEdit->fontMetrics().lineSpacing() * 3;
+    int editMinHeight = m_inputEdit->fontMetrics().lineSpacing() * 2;  // Reduced from 3 to 2 lines
     int bottomRowAndMargins = 55;
     return QSize(0, editMinHeight + bottomRowAndMargins);
 }

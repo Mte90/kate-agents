@@ -18,6 +18,9 @@ class ConfigManager;
 class PermissionManager;
 class AgentPanel;
 class ContextMenuHandler;
+class CodebaseIndexer;
+class CustomToolManager;
+class AuditLogger;
 
 class KateAgentPlugin : public KTextEditor::Plugin
 {
@@ -39,6 +42,7 @@ public:
     AgentLoop *agentLoop() const { return m_agentLoop; }
     ConfigManager *config() const { return m_config; }
     PermissionManager *permissionManager() const { return m_permissions; }
+    CodebaseIndexer *codebaseIndexer() const { return m_codebaseIndexer; }
     
     signals:
     void settingsChanged();
@@ -53,6 +57,9 @@ private:
     QPointer<AgentPanel> m_agentPanel;
     ConfigManager *m_config = nullptr;
     PermissionManager *m_permissions = nullptr;
+    CodebaseIndexer *m_codebaseIndexer = nullptr;
+    CustomToolManager *m_customToolManager = nullptr;
+    AuditLogger *m_auditLogger = nullptr;
     ContextMenuHandler *m_contextMenuHandler = nullptr;
     QSet<KTextEditor::View*> m_installedViews;
     

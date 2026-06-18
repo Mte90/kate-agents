@@ -18,6 +18,7 @@ OpenAIProvider::OpenAIProvider(const QString &baseUrl, const QString &apiKey, QO
     , m_baseUrl(baseUrl)
     , m_apiKey(apiKey)
     , m_nam(new QNetworkAccessManager(this))
+    , m_rateLimitSemaphore(2)  // Allow max 2 concurrent requests
 {
 }
 
@@ -235,10 +236,15 @@ void OpenAIProvider::chatStream(
     
     QByteArray payload = QJsonDocument(json).toJson();
     
+    // Acquire rate limit semaphore (blocks if too many concurrent requests)
+    m_rateLimitSemaphore.acquire();
+    
     QNetworkReply *reply = m_nam->post(request, payload);
     m_currentReply = reply;
     
     QObject::connect(reply, &QNetworkReply::finished, [this, reply, request, payload, onChunk, onDone, onError]() {
+        // Release semaphore when done
+        m_rateLimitSemaphore.release();
         m_currentReply = nullptr;
         
         if (reply->error() == QNetworkReply::NoError) {
@@ -272,6 +278,8 @@ void OpenAIProvider::chatStream(
                             QJsonObject delta = choice["delta"].toObject();
                             QString content = delta["content"].toString();
                             QString reasoningContent = delta["reasoning_content"].toString();
+                            // Remove pipe separators if present (fix for tokenized stream)
+                            content.remove("|");
                             if (!reasoningContent.isEmpty()) {
                                 reasoningText += reasoningContent;
                             }
@@ -331,6 +339,8 @@ void OpenAIProvider::chatStream(
                                             QJsonObject delta = choices.at(0).toObject()["delta"].toObject();
                                             QString content = delta["content"].toString();
                                             QString reasoningContent = delta["reasoning_content"].toString();
+                                            // Remove pipe separators if present (fix for tokenized stream)
+                                            content.remove("|");
                                             if (!reasoningContent.isEmpty()) {
                                                 thinkingText += reasoningContent;
                                             }

@@ -1,5 +1,5 @@
 #include <QtTest/QtTest>
-#include "../src/contextmenhander.h"
+#include "../src/contextMenuHandler.h"
 #include "../src/ui/agentpanel.h"
 #include <QSignalSpy>
 

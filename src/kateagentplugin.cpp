@@ -5,7 +5,7 @@
 #include "toolregistry.h"
 #include "configmanager.h"
 #include "permissionmanager.h"
-#include "contextmenhander.h"
+#include "contextMenuHandler.h"
 #include "ui/agentpanel.h"
 #include "ui/agentconfigpage.h"
 #include "tools/readfiletool.h"
@@ -19,6 +19,11 @@
 #include "tools/listdirectorytool.h"
 #include "tools/createdirectorytool.h"
 #include "tools/applydifftool.h"
+#include "tools/batchededitstool.h"
+#include "codebaseindexer.h"
+#include "tools/codebasesearchtool.h"
+#include "customtoolmanager.h"
+#include "auditlogger.h"
 #include <KActionCollection>
 #include <KLocalizedString>
 #include <KPluginFactory>
@@ -26,6 +31,8 @@
 #include <KTextEditor/MainWindow>
 #include <KXMLGUIClient>
 #include <KXMLGUIFactory>
+#include <KConfigGroup>
+#include <KSharedConfig>
 #include <QMainWindow>
 #include <QDebug>
 #include <QTimer>
@@ -80,12 +87,18 @@ public:
             
             if (m_toolView->isVisible()) {
                 m_mainWindow->hideToolView(m_toolView);
-                m_plugin->config()->setPanelVisible(false);
-                m_plugin->config()->save();
+                // Save panel state to Kate config (not JSON)
+                KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
+                group.writeEntry("PanelVisible", false);
+                group.sync();
+                qDebug() << "Panel hidden - saved to kateagentrc";
             } else {
                 m_mainWindow->showToolView(m_toolView);
-                m_plugin->config()->setPanelVisible(true);
-                m_plugin->config()->save();
+                // Save panel state to Kate config (not JSON)
+                KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
+                group.writeEntry("PanelVisible", true);
+                group.sync();
+                qDebug() << "Panel shown - saved to kateagentrc";
             }
         });
 
@@ -115,8 +128,10 @@ public:
                 }
             }
             
-            // Restore panel visibility state from config
-            bool shouldShow = m_plugin->config()->panelVisible();
+            // Restore panel visibility state from Kate config (not JSON)
+            KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
+            bool shouldShow = group.readEntry("PanelVisible", false);
+            qDebug() << "Restoring panel state from kateagentrc: shouldShow=" << shouldShow;
             if (shouldShow) {
                 m_mainWindow->showToolView(m_toolView);
             }
@@ -132,8 +147,10 @@ public:
         // Save current panel visibility state before destruction
         if (m_toolView && m_plugin && m_plugin->config()) {
             bool isVisible = m_toolView->isVisible();
-            m_plugin->config()->setPanelVisible(isVisible);
-            m_plugin->config()->save();
+            KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
+            group.writeEntry("PanelVisible", isVisible);
+            group.sync();
+            qDebug() << "Panel state saved on destruction:" << isVisible;
         }
     }
     
@@ -159,12 +176,23 @@ KateAgentPlugin::KateAgentPlugin(QObject *parent, const QVariantList &) : KTextE
     
     m_agentLoop = new AgentLoop(m_provider, m_registry, this);
     m_permissions = new PermissionManager(this);
+    m_codebaseIndexer = new CodebaseIndexer(this);
+    m_customToolManager = new CustomToolManager(this);
+    m_auditLogger = new AuditLogger(this);
     
     // Wire PermissionManager into ToolRegistry
     m_registry->setPermissionManager(m_permissions);
     
+    // Wire audit logger into ToolRegistry
+    if (m_auditLogger) {
+        m_registry->setAuditLogger(m_auditLogger);
+    }
+    
     // Initialize context menu handler
     m_contextMenuHandler = new ContextMenuHandler(m_agentLoop, this);
+    
+    // Load custom tools
+    m_customToolManager->loadCustomTools();
     
     // Register all tools
     m_registry->registerTool(new ReadFileTool(this));
@@ -178,6 +206,22 @@ KateAgentPlugin::KateAgentPlugin(QObject *parent, const QVariantList &) : KTextE
     m_registry->registerTool(new ListDirectoryTool(this));
     m_registry->registerTool(new CreateDirectoryTool(this));
     m_registry->registerTool(new ApplyDiffTool(this));
+    m_registry->registerTool(new BatchedEditTool(this));
+    m_registry->registerTool(new CodebaseSearchTool(m_codebaseIndexer, this));
+    
+    // Register custom tools
+    for (const QString &toolName : m_customToolManager->toolNames()) {
+        if (AgentTool *customTool = m_customToolManager->tool(toolName)) {
+            m_registry->registerTool(customTool);
+        }
+    }
+    
+    // Connect custom tool manager signals to re-register tools
+    connect(m_customToolManager, &CustomToolManager::toolAdded, this, [this](const QString &name) {
+        if (AgentTool *tool = m_customToolManager->tool(name)) {
+            m_registry->registerTool(tool);
+        }
+    });
 }
 
 KateAgentPlugin::~KateAgentPlugin()

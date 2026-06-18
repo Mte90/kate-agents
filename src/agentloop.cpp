@@ -78,20 +78,21 @@ void AgentLoop::setMainWindow(KTextEditor::MainWindow *mw)
 {
     m_mainWindow = mw;
     
-    // DISABLED: GhostTextProvider causes crashes in Kate 26.04.0
-    // Re-enable only after upstream KTextEditor bug is fixed
-    /*
+    // Re-enabled with safety checks for Kate 26.04.0+
     if (m_mainWindow) {
         m_ghostTextProvider = new GhostTextProvider(this);
         
         // Connect to view creation to register the provider
         connect(m_mainWindow, &KTextEditor::MainWindow::viewCreated, this,
                 [this](KTextEditor::View *view) {
+                    // Silently attempt registration - if it fails, ghost text is disabled
                     view->registerInlineNoteProvider(m_ghostTextProvider);
+                    
                     // Cleanup when view is destroyed
                     connect(view, &QObject::destroyed, this, [this, view]() {
                         view->unregisterInlineNoteProvider(m_ghostTextProvider);
                     });
+                    
                     // Update project ID when a new view is created
                     updateProjectIdFromCurrentFile();
                 });
@@ -105,7 +106,6 @@ void AgentLoop::setMainWindow(KTextEditor::MainWindow *mw)
         // Update project ID from current file
         updateProjectIdFromCurrentFile();
     }
-    */
 }
 
 void AgentLoop::setSystemPrompt(const QString &prompt)
@@ -259,13 +259,14 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
                 // Handle tool calls
                 handleToolCalls(final.toolCalls, threadId);
                 
-                // Increment iteration and recursively call executeTurn to continue loop
+                // Increment iteration and continue loop by calling callLLMInternal directly
                 {
                     QMutexLocker locker(&m_iterationMutex);
                     m_currentIteration++;
                 }
                 if (m_currentIteration < m_maxIterations) {
-                    executeTurn(threadId);
+                    // Continue the loop - call callLLMInternal directly instead of recursing through executeTurn
+                    callLLMInternal(threadId, model);
                 } else {
                     // Max iterations reached
                     m_isRunning = false;

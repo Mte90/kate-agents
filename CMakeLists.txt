@@ -52,6 +52,8 @@ set(PROJECT_SOURCES
     src/permissionmanager.cpp
     src/configmanager.h
     src/configmanager.cpp
+    src/auditlogger.h
+    src/auditlogger.cpp
     src/editorcontext.h
     src/editorcontext.cpp
     src/toolregistry.h
@@ -60,8 +62,8 @@ set(PROJECT_SOURCES
     src/ghosttextprovider.cpp
     src/threadstorage.h
     src/threadstorage.cpp
-    src/contextmenhander.h
-    src/contextmenhander.cpp
+    src/contextMenuHandler.h
+    src/contextMenuHandler.cpp
     src/ithreadstorage.h
     src/threadjson.h
     src/threadjson.cpp
@@ -76,6 +78,16 @@ set(PROJECT_SOURCES
     src/tools/listdirectorytool.h
     src/tools/createdirectorytool.h
     src/tools/applydifftool.h
+    src/tools/batchededitstool.h
+    src/tools/batchededitstool.cpp
+    src/codebaseindexer.h
+    src/codebaseindexer.cpp
+    src/tools/codebasesearchtool.h
+    src/tools/codebasesearchtool.cpp
+    src/customtool.h
+    src/customtool.cpp
+    src/customtoolmanager.h
+    src/customtoolmanager.cpp
     src/ui/agentconfigpage.h
     src/ui/agentconfigpage.cpp
     src/ui/agentpanel.h

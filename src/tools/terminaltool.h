@@ -44,6 +44,22 @@ private:
             return false;
         }
 
+        // Check for dangerous pipe patterns (curl | bash, wget | sh, etc.)
+        if (trimmed.contains(QRegularExpression("|\\s*(bash|sh|zsh|fish|ksh|dash|csh|tcsh)"))) {
+            return true;
+        }
+
+        // Check for dangerous redirect patterns (writing to system files)
+        if (trimmed.contains(QRegularExpression(">\\s*(/etc/|/usr/|/bin/|/sbin/|/lib/)"))) {
+            return true;
+        }
+
+        // Check for dangerous environment variable injection
+        if (trimmed.contains(QRegularExpression("\\$\\(.*\\)|`.*`"))) {
+            // Allow simple variable expansion but block command substitution
+            return true;
+        }
+
         QString firstWord = trimmed.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts).first().toLower();
 
         if (firstWord.contains("/")) {
@@ -105,19 +121,22 @@ public:
         QProcess process;
         process.setWorkingDirectory(workingDir);
         
-        QEventLoop loop;
         QTimer timeoutTimer;
         timeoutTimer.setSingleShot(true);
         timeoutTimer.start(timeout * 1000);
         
-        connect(&process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-                &loop, &QEventLoop::quit);
-        connect(&timeoutTimer, &QTimer::timeout, [&]() {
-            process.kill();
-        });
-        
         process.start("bash", QStringList() << "-c" << command);
-        process.waitForFinished(-1);
+        
+        // Wait for process to finish OR timeout
+        while (process.state() == QProcess::Running && timeoutTimer.isActive()) {
+            process.waitForFinished(100);  // Wait 100ms at a time
+        }
+        
+        bool timedOut = !timeoutTimer.isActive() && process.state() == QProcess::Running;
+        if (timedOut) {
+            process.kill();
+            process.waitForFinished(1000);  // Give it 1 second to clean up
+        }
         
         QString stdout = process.readAllStandardOutput();
         QString stderr = process.readAllStandardError();
@@ -137,7 +156,7 @@ public:
             {"command", command},
             {"output", output},
             {"exit_code", exitCode},
-            {"timed_out", timeoutTimer.isActive() == false && process.state() == QProcess::NotRunning}
+            {"timed_out", timedOut}
         };
     }
 

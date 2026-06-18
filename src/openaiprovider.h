@@ -4,6 +4,7 @@
 #include "llmprovider.h"
 #include <QNetworkAccessManager>
 #include <QTimer>
+#include <QSemaphore>
 
 class OpenAIProvider : public LLMProvider
 {
@@ -54,8 +55,12 @@ private:
     QNetworkAccessManager *m_nam;
     QNetworkReply *m_currentReply = nullptr;
     QByteArray m_lineBuffer;  // SSE line buffer for incremental parsing
+    std::function<void(const QString &)> m_onChunk;
+    std::function<void(const LLMResponse &)> m_onDone;
+    std::function<void(const QString &)> m_onError;
     int m_retryCount = 0;
     static const int MAX_RETRIES = 3;
+    QSemaphore m_rateLimitSemaphore;  // Max 2 concurrent requests
 };
 
 #endif

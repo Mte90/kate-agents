@@ -1,7 +1,8 @@
-#include "contextmenhander.h"
+#include "contextMenuHandler.h"
 #include "agentloop.h"
 #include <QAction>
 #include <QDebug>
+#include <KLocalizedString>
 
 ContextMenuHandler::ContextMenuHandler(AgentLoop *agentLoop, QObject *parent)
     : QObject(parent)
@@ -26,7 +27,7 @@ void ContextMenuHandler::installContextMenu(KTextEditor::View *view)
         return;
     }
 
-    QAction *action = new QAction("Ask agent about this", this);
+    QAction *action = new QAction(i18n("Ask agent about this"), this);
     action->setParent(view);
     connect(action, &QAction::triggered, this, &ContextMenuHandler::onAskAgentAboutThis);
 

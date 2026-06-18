@@ -1,5 +1,5 @@
 #include <QtTest/QtTest>
-#include "../src/contextmenhander.h"
+#include "../src/contextMenuHandler.h"
 
 class TestContextMenuHandler : public QObject
 {

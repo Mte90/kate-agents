@@ -4,6 +4,7 @@
 #include "llmprovider.h"
 #include "toolregistry.h"
 #include "threadstorage.h"
+#include "auditlogger.h"
 #include <QObject>
 #include <vector>
 #include <QString>
@@ -46,6 +47,7 @@ public:
 
     void setSystemPrompt(const QString &prompt);
     void setMaxIterations(int max) { m_maxIterations = max; }
+    void setAuditLogger(AuditLogger *logger) { if (m_registry) m_registry->setAuditLogger(logger); }
 
     bool isRunning() const { return m_isRunning; }
     QString currentThreadId() const { return m_currentThreadId; }

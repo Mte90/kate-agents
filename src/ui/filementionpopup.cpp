@@ -2,7 +2,7 @@
 #include <QTextEdit>
 
 FileMentionPopup::FileMentionPopup(QWidget *parent)
-    : QWidget(parent)
+    : QWidget(nullptr)  // No parent to avoid geometry issues
     , m_listView(nullptr)
     , m_model(nullptr)
 {
@@ -108,8 +108,6 @@ void FileMentionPopup::showAt(const QPoint &pos)
         return;
     }
 
-    setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
-
     // Calculate popup size and clamp to screen bounds
     int width = m_listView->width();
     int height = m_listView->height();
@@ -129,7 +127,9 @@ void FileMentionPopup::showAt(const QPoint &pos)
     }
     y = qBound(screenGeom.top(), y, screenGeom.bottom() - height);
 
-    setGeometry(x, y, width, height);
+    // Set geometry and show
+    move(x, y);
+    resize(width, height);
     show();
 }
 

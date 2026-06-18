@@ -5,6 +5,7 @@
 #include <QString>
 #include <QMap>
 #include <QMutex>
+#include <QEventLoop>
 
 enum class PermissionPolicy {
     Allow,
@@ -45,6 +46,9 @@ private:
     QMap<QString, PermissionPolicy> m_toolPolicies;
     QMap<QString, bool> m_sessionPermissions;
     mutable QMutex m_mutex;
+    QEventLoop *m_waitLoop = nullptr;
+    QString m_pendingTool;
+    bool m_permissionGranted = false;
 };
 
 #endif
