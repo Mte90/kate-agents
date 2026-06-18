@@ -1,7 +1,7 @@
 #include "filementionpopup.h"
 #include <QTextEdit>
 
-FileMentionPopup::FileMentionPopup(QWidget *parent)
+FileMentionPopup::FileMentionPopup(QWidget *)
     : QWidget(nullptr)  // No parent to avoid geometry issues
     , m_listView(nullptr)
     , m_model(nullptr)
