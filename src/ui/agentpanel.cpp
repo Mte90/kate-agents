@@ -137,7 +137,7 @@ void AgentPanel::connectSignals()
     
     if (m_agent) {
         connect(m_agent, &AgentLoop::responseStarted, this, &AgentPanel::onResponseStarted);
-        connect(m_agent, &AgentLoop::responseChunk, this, &AgentPanel::onResponseChunk);
+        connect(m_agent, &AgentLoop::chunkReceived, this, &AgentPanel::onChunkReceived);
         connect(m_agent, &AgentLoop::toolCallStarted, this, &AgentPanel::onToolCallStarted);
         connect(m_agent, &AgentLoop::toolCallCompleted, this, &AgentPanel::onToolCallCompleted);
         connect(m_agent, &AgentLoop::turnCompleted, this, &AgentPanel::onTurnCompleted);
@@ -363,7 +363,6 @@ void AgentPanel::onTabCloseRequested(int index)
 
 void AgentPanel::onDeleteMessage(int messageId)
 {
-    Q_UNUSED(messageId);
     if (m_currentThreadId.isEmpty() || !m_agent) {
         return;
     }
@@ -378,13 +377,18 @@ void AgentPanel::onDeleteMessage(int messageId)
         return;
     }
     
-    int lastIndex = messages.size() - 1;
-    m_agent->deleteMessage(m_currentThreadId, lastIndex);
+    // Use the provided messageId as the index
+    if (messageId < 0 || messageId >= messages.size()) {
+        return;
+    }
+    
+    m_agent->deleteMessage(m_currentThreadId, messageId);
     
     if (m_tabs->count() > 0) {
         ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->currentWidget());
         if (threadView) {
-            threadView->loadMessages(messages);
+            // Reload messages to reflect the deletion
+            threadView->loadMessages(m_agent->getThreads()[m_currentThreadId].messages);
         }
     }
 }
@@ -416,7 +420,7 @@ void AgentPanel::onSendMessage(const QString &message)
         return;
     }
     
-    if (!m_agent || message.trimmed().isEmpty() || m_currentThreadId.isEmpty()) {
+    if (!m_agent || !m_inputBar || message.trimmed().isEmpty() || m_currentThreadId.isEmpty()) {
         return;
     }
     
@@ -508,12 +512,13 @@ void AgentPanel::onResponseStarted()
     }
 }
 
-void AgentPanel::onResponseChunk(const QString &chunk)
+void AgentPanel::onChunkReceived(const QString &threadId, const QString &chunk, bool isThinking)
 {
-    if (m_activeThreadId.isEmpty()) {
+    if (isThinking) {
         return;
     }
-    int index = m_tabHash.value(m_activeThreadId, -1);
+
+    int index = m_tabHash.value(threadId, -1);
     if (index >= 0) {
         ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(index));
         if (threadView) {
@@ -576,11 +581,7 @@ void AgentPanel::onTurnCompleted()
     if (index >= 0) {
         ThreadView *threadView = qobject_cast<ThreadView*>(m_tabs->widget(index));
         if (threadView) {
-            if (!thinking.isEmpty()) {
-                threadView->appendAssistantMessage(content, thinking);
-            } else {
-                threadView->endStreaming();
-            }
+            threadView->endStreaming();
         }
     }
     

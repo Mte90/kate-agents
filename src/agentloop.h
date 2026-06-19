@@ -58,17 +58,18 @@ public:
     void deleteThread(const QString &threadId);
     QMap<QString, ConversationThread> &getThreads() { return m_threads; }
 
-signals:
-    void responseStarted();
-    void responseChunk(const QString &chunk);
-    void thinkingChunk(const QString &thinking);
-    void toolCallStarted(const QString &toolName, const QJsonObject &args);
-    void toolCallCompleted(const QString &toolName, const QJsonObject &result);
-    void turnCompleted(const QString &threadId);
-    void error(const QString &error);
-    void runningChanged(bool running);
-    void threadUpdated(const QString &threadId);
-    void titleGenerated(const QString &threadId, const QString &title);
+    signals:
+        void responseStarted();
+        void responseChunk(const QString &chunk);
+        void thinkingChunk(const QString &thinking);
+        void chunkReceived(const QString &threadId, const QString &chunk, bool isThinking);
+        void toolCallStarted(const QString &toolName, const QJsonObject &args);
+        void toolCallCompleted(const QString &toolName, const QJsonObject &result);
+        void turnCompleted(const QString &threadId);
+        void error(const QString &error);
+        void runningChanged(bool running);
+        void threadUpdated(const QString &threadId);
+        void titleGenerated(const QString &threadId, const QString &title);
 
 private:
     void buildRequest(const QString &threadId);
@@ -94,6 +95,6 @@ private:
     std::vector<LLMMessage> m_currentRequest;
     std::vector<ToolDefinition> m_currentTools;
     GhostTextProvider *m_ghostTextProvider = nullptr;
-};
-
-#endif
+    };
+    
+    #endif

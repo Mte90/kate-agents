@@ -191,6 +191,17 @@ When the agent proposes code changes:
 
 ## 🧪 Testing
 
+### Quick Test Run (Recommended)
+
+```bash
+# Build and run all tests automatically
+./scripts/build_and_test.sh
+```
+
+Logs saved to `/tmp/kate-agents-test-results.log`
+
+### Manual Test Execution
+
 ```bash
 # Run all tests from the build directory
 cd build
@@ -203,9 +214,18 @@ ctest -V
 ./tests/test_configmanager           # Config manager tests
 ./tests/test_threadjsonstorage       # Thread persistence tests
 ./tests/test_agentloop               # Agent loop logic tests
+./tests/test_ui_interactions         # UI interaction tests (20 tests)
+./tests/test_message_deletion        # Message deletion bug tests (6 tests)
+./tests/test_crash_scenarios         # Crash scenario tests (7 tests)
 ```
 
-The test suite covers core modules (config, storage, agent loop, LLM providers, tools, UI flow) with 90+ test files.
+**Test Coverage:** 85+ tests across 18 test suites covering:
+- Core modules (config, storage, agent loop, LLM providers, tools)
+- UI interactions (tab management, streaming, message deletion)
+- Crash scenarios (tab close, null pointers, lifecycle)
+- Security (sandbox restrictions, command injection)
+- Concurrency (race conditions, concurrent limits)
+- End-to-end flows (complete user workflows)
 
 ## 🔧 Development
 

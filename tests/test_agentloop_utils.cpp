@@ -177,8 +177,8 @@ private slots:
     void testThreadWithMessages()
     {
         ConversationThread thread;
-        thread.messages.append(LLMMessage{{{"role", "user"}, {"content", "Hi"}}});
-        thread.messages.append(LLMMessage{{{"role", "assistant"}, {"content", "Hello"}}});
+        thread.messages.append(LLMMessage{"user", "Hi"});
+        thread.messages.append(LLMMessage{"assistant", "Hello"});
         QVERIFY(thread.messages.size() == 2);
     }
 
@@ -230,8 +230,8 @@ private slots:
     void testMessageVectorPushBack()
     {
         std::vector<LLMMessage> msgs;
-        msgs.push_back(LLMMessage{{{"role", "user"}, {"content", "Hello"}}});
-        msgs.push_back(LLMMessage{{{"role", "assistant"}, {"content", "Hi"}}});
+        msgs.push_back(LLMMessage{"user", "Hello"});
+        msgs.push_back(LLMMessage{"assistant", "Hi"});
         QVERIFY(msgs.size() == 2);
     }
 

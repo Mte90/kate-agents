@@ -99,7 +99,7 @@ public slots:
 
 private slots:
     void onResponseStarted();
-    void onResponseChunk(const QString &chunk);
+    void onChunkReceived(const QString &threadId, const QString &chunk, bool isThinking);
     void onSystemPromptChanged(const QString &prompt);
     void onToolCallStarted(const QString &toolName, const QJsonObject &args);
     void onToolCallCompleted(const QString &toolName, const QJsonObject &result);

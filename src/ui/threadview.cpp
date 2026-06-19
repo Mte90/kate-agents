@@ -83,6 +83,11 @@ ThreadView::~ThreadView() = default;
 
 QString ThreadView::escapeHtml(const QString &text) const
 {
+    return escapeHtmlStatic(text);
+}
+
+QString ThreadView::escapeHtmlStatic(const QString &text)
+{
     QString result = text;
     result.replace("&", "&amp;");
     result.replace("<", "&lt;");
@@ -93,6 +98,12 @@ QString ThreadView::escapeHtml(const QString &text) const
 }
 
 QString ThreadView::parseMarkdown(const QString &text)
+{
+    // Delegate to static helper
+    return parseMarkdownStatic(text);
+}
+
+QString ThreadView::parseMarkdownStatic(const QString &text)
 {
     // Step 1: Process code blocks BEFORE HTML escaping (SyntaxHighlighter handles its own escaping)
     // Use placeholder markers to avoid double-escaping the code block HTML
@@ -108,24 +119,26 @@ QString ThreadView::parseMarkdown(const QString &text)
         qsizetype length;
         QString placeholder;
         QString codeId;
+        QString html;  // Store HTML directly for static function
     };
     QList<CodeBlockReplacement> blocks;
+    
+    // Use local counter for static function
+    int codeBlockCounter = 0;
     
     while ((match = codeBlockRegex.match(result, offset)).hasMatch()) {
         QString language = match.captured(1);
         QString code = match.captured(2);
         
-        QString id = QString("code_%1").arg(++m_codeBlockCounter);
-        m_codeBlocks[id] = code;
+        QString id = QString("code_%1").arg(++codeBlockCounter);
         
         QString highlighted = SyntaxHighlighter::highlight(code, language);
         
         QString html = QString("<pre><a href='copy:%1' class='copy-btn'>Copy</a><code>%2</code></pre>")
                        .arg(id, highlighted);
         
-        QString placeholder = QString("\x01CODEBLOCK_%1\x01").arg(m_codeBlockCounter);
-        blocks.prepend({match.capturedStart(), match.capturedLength(), placeholder, id});
-        m_codeBlockHtml[id] = html;
+        QString placeholder = QString("\x01CODEBLOCK_%1\x01").arg(codeBlockCounter);
+        blocks.prepend({match.capturedStart(), match.capturedLength(), placeholder, id, html});
         offset = match.capturedEnd();
     }
     
@@ -133,7 +146,7 @@ QString ThreadView::parseMarkdown(const QString &text)
         result.replace(block.position, block.length, block.placeholder);
     }
     
-    result = escapeHtml(result);
+    result = escapeHtmlStatic(result);
     
     // Headers before code block restoration to avoid matching # inside code blocks
     result.replace(QRegularExpression("^######\\s+(.+)$", QRegularExpression::MultilineOption), "<h6>\\1</h6>");
@@ -144,7 +157,7 @@ QString ThreadView::parseMarkdown(const QString &text)
     result.replace(QRegularExpression("^#\\s+(.+)$", QRegularExpression::MultilineOption), "<h1>\\1</h1>");
     
     for (const auto &block : blocks) {
-        result.replace(escapeHtml(block.placeholder), m_codeBlockHtml[block.codeId]);
+        result.replace(escapeHtmlStatic(block.placeholder), block.html);
     }
     
     // Step 5: Process remaining inline markdown
@@ -174,8 +187,6 @@ void ThreadView::appendHtml(const QString &html)
     scrollToBottom();
 }
 
-static int s_messageId = 0;
-
 void ThreadView::appendUserMessage(const QString &message, const QString &profile)
 {
     QString header = i18n("User:");
@@ -184,9 +195,10 @@ void ThreadView::appendUserMessage(const QString &message, const QString &profil
     }
     QString prefix = m_isFirstMessage ? "" : "<hr>";
     m_isFirstMessage = false;
-    int msgId = ++s_messageId;
+    // Use message count as index (0-based)
+    int msgIndex = m_allMessages.size();
     appendHtml(prefix + QString("<div class='user-message' id='msg_%1' style='position:relative'><a href='delete:%1' style='position:absolute;right:8px;top:4px;color:#888;text-decoration:none;font-size:0.7em;'>✕</a><strong>%2</strong><br>%3</div>")
-               .arg(QString::number(msgId), header, parseMarkdown(message)));
+               .arg(QString::number(msgIndex), header, parseMarkdown(message)));
 }
 
 void ThreadView::appendAssistantMessage(const QString &message, const QString &thinking)
@@ -197,8 +209,9 @@ void ThreadView::appendAssistantMessage(const QString &message, const QString &t
                    .arg(escapeHtml(thinking));
     }
     
-    int msgId = ++s_messageId;
-    content += QString("<div class='assistant-message' id='msg_%1' style='position:relative'><a href='delete:%1' style='position:absolute;right:8px;top:4px;color:#888;text-decoration:none;font-size:0.7em;'>✕</a>%2</div>").arg(QString::number(msgId), parseMarkdown(message));
+    // Use message count as index (0-based)
+    int msgIndex = m_allMessages.size();
+    content += QString("<div class='assistant-message' id='msg_%1' style='position:relative'><a href='delete:%1' style='position:absolute;right:8px;top:4px;color:#888;text-decoration:none;font-size:0.7em;'>✕</a>%2</div>").arg(QString::number(msgIndex), parseMarkdown(message));
     QString prefix = m_isFirstMessage ? "" : "<hr>";
     m_isFirstMessage = false;
     appendHtml(prefix + content);
@@ -321,11 +334,11 @@ void ThreadView::endStreaming()
         cursor.movePosition(QTextCursor::End, QTextCursor::MoveAnchor);
         cursor.removeSelectedText();
         
-        QString markdownHtml = parseMarkdown(streamingContent);
+        QString markdownHtml = this->parseMarkdown(streamingContent);
         insertHtml(markdownHtml);
         insertHtml("</div><br>");
     } else if (!streamingContent.isEmpty()) {
-        insertHtml(parseMarkdown(streamingContent));
+        insertHtml(this->parseMarkdown(streamingContent));
         insertHtml("<br>");
     }
     
@@ -366,7 +379,11 @@ void ThreadView::toggleCursor()
 
 void ThreadView::loadMessages(const QList<LLMMessage> &messages)
 {
-    m_allMessages = messages;
+    m_allMessages.clear();
+    m_allMessages.reserve(messages.size());
+    for (const auto &msg : messages) {
+        m_allMessages.push_back(msg);
+    }
     clear();
     
     const bool truncated = m_allMessages.size() > MAX_VISIBLE_MESSAGES;
@@ -378,7 +395,7 @@ void ThreadView::loadMessages(const QList<LLMMessage> &messages)
                    .arg(i18np("Show %1 older message...", "Show %1 older messages...", older)));
     }
     
-    for (int i = startIndex; i < m_allMessages.size(); ++i) {
+    for (size_t i = static_cast<size_t>(startIndex); i < m_allMessages.size(); ++i) {
         const auto &msg = m_allMessages[i];
         if (msg.role == "user") {
             appendUserMessage(msg.content, msg.profile);
@@ -411,7 +428,12 @@ void ThreadView::onAnchorClicked(const QUrl &url)
 {
     QString urlStr = url.toString();
     if (urlStr == "show-all") {
-        loadMessages(m_allMessages);
+        QList<LLMMessage> messages;
+        messages.reserve(m_allMessages.size());
+        for (const auto &msg : m_allMessages) {
+            messages.append(msg);
+        }
+        loadMessages(messages);
     } else if (urlStr.startsWith("copy:")) {
         QString id = urlStr.mid(5);
         if (m_codeBlocks.contains(id)) {

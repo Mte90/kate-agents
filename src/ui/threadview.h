@@ -36,7 +36,14 @@ public:
     QSize sizeHint() const override { return QSize(0, 0); }
     QSize minimumSizeHint() const override { return QSize(0, 0); }
 
+    // Getter for testing
+    const std::vector<LLMMessage>& getAllMessages() const { return m_allMessages; }
+    
+    // Static helper for testing
+    static QString parseMarkdownStatic(const QString &text);
+    
 protected:
+    QString parseMarkdown(const QString &text);
     void showEvent(QShowEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void setSource(const QUrl &name);
@@ -53,9 +60,9 @@ private:
     
     bool m_isFirstMessage = true;
     bool m_cursorVisible = true;
-    QList<LLMMessage> m_allMessages;
-    QString parseMarkdown(const QString &text);
+    std::vector<LLMMessage> m_allMessages;
     QString escapeHtml(const QString &text) const;
+    static QString escapeHtmlStatic(const QString &text);
     
     QString m_streamingContent;
     QString m_streamingThinking;

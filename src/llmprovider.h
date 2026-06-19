@@ -1,6 +1,7 @@
 #ifndef LLMPROVIDER_H
 #define LLMPROVIDER_H
 
+#include <QtGlobal>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -18,12 +19,10 @@ struct LLMMessage {
     QString thinking;
     
     LLMMessage() = default;
-    LLMMessage(const LLMMessage&) = default;
-    LLMMessage& operator=(const LLMMessage&) = default;
-    ~LLMMessage() noexcept {}
+    ~LLMMessage() noexcept(true) = default;
 };
 
-Q_DECLARE_TYPEINFO(LLMMessage, Q_RELOCATABLE_TYPE);
+Q_DECLARE_METATYPE(LLMMessage)
 
 struct ToolCall {
     QString id;

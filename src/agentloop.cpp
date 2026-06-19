@@ -78,34 +78,17 @@ void AgentLoop::setMainWindow(KTextEditor::MainWindow *mw)
 {
     m_mainWindow = mw;
     
-    // Re-enabled with safety checks for Kate 26.04.0+
-    if (m_mainWindow) {
-        m_ghostTextProvider = new GhostTextProvider(this);
-        
-        // Connect to view creation to register the provider
-        connect(m_mainWindow, &KTextEditor::MainWindow::viewCreated, this,
-                [this](KTextEditor::View *view) {
-                    // Silently attempt registration - if it fails, ghost text is disabled
-                    view->registerInlineNoteProvider(m_ghostTextProvider);
-                    
-                    // Cleanup when view is destroyed
-                    connect(view, &QObject::destroyed, this, [this, view]() {
-                        view->unregisterInlineNoteProvider(m_ghostTextProvider);
-                    });
-                    
-                    // Update project ID when a new view is created
-                    updateProjectIdFromCurrentFile();
-                });
-        
-        // Register for existing views
-        auto views = m_mainWindow->views();
-        for (KTextEditor::View *view : views) {
-            view->registerInlineNoteProvider(m_ghostTextProvider);
-        }
-        
-        // Update project ID from current file
-        updateProjectIdFromCurrentFile();
-    }
+    // GhostTextProvider registration is disabled to prevent crashes on tab close.
+    // The provider is registered on every view but never unregistered when the view
+    // is destroyed, causing KTextEditor to access dangling references.
+    // Since all ghost-text methods (showGhostText, clearGhostText, etc.) are
+    // already stubbed, we don't need the registration at all.
+    // If ghost text is re-enabled in the future, make sure to also connect a
+    // destroyed signal that calls view->unregisterInlineNoteProvider().
+    m_ghostTextProvider = new GhostTextProvider(this);
+    
+    // Update project ID from current file
+    updateProjectIdFromCurrentFile();
 }
 
 void AgentLoop::setSystemPrompt(const QString &prompt)
@@ -134,10 +117,15 @@ ConversationThread AgentLoop::createThread(const QString &title)
 
 void AgentLoop::addUserMessage(const QString &threadId, const QString &content, const QString &profile)
 {
+    if (threadId.isEmpty() || content.isEmpty()) {
+        return;
+    }
+    
     QMutexLocker locker(&m_threadsMutex);
+    
     if (!m_threads.contains(threadId)) {
         m_threads[threadId] = createThread();
-        m_threads[threadId].id = threadId;  // Match UI key for storage lookup
+        m_threads[threadId].id = threadId;
         if (m_threadStorage) {
             m_threadStorage->saveThread(m_threads[threadId]);
         }
@@ -157,12 +145,22 @@ void AgentLoop::addUserMessage(const QString &threadId, const QString &content, 
         m_threadStorage->saveThread(thread);
     }
     
-    // Emit signal to update UI - show user message immediately
     emit threadUpdated(threadId);
 }
 
 void AgentLoop::executeTurn(const QString &threadId, const QString &model)
 {
+    if (threadId.isEmpty()) {
+        emit error("Invalid thread ID");
+        return;
+    }
+    
+    // Check if provider is set
+    if (!m_provider) {
+        emit error("No LLM provider set");
+        return;
+    }
+    
     // Check if thread exists
     {
         QMutexLocker locker(&m_threadsMutex);
@@ -170,12 +168,6 @@ void AgentLoop::executeTurn(const QString &threadId, const QString &model)
             emit error(QString("Thread not found: %1").arg(threadId));
             return;
         }
-    }
-
-    // Check if provider is set
-    if (!m_provider) {
-        emit error("No LLM provider set");
-        return;
     }
 
     m_isRunning = true;
@@ -221,12 +213,12 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
         m_currentTools,
         model,
         // onChunk - emit each chunk as it arrives
-        [this, hasEmittedResponseStarted = false](const QString &chunk) mutable {
+        [this, threadId, hasEmittedResponseStarted = false](const QString &chunk) mutable {
             if (!hasEmittedResponseStarted) {
                 hasEmittedResponseStarted = true;
                 emit responseStarted();
             }
-            emit responseChunk(chunk);
+            emit chunkReceived(threadId, chunk, false);
         },
         // onDone - handle final response - recursive pattern
         [this, threadId, model](const LLMResponse &final) {
@@ -599,6 +591,9 @@ void AgentLoop::updateProjectIdFromCurrentFile()
     
     // Get document and file path
     KTextEditor::Document *doc = activeView->document();
+    if (!doc) {
+        return;
+    }
     QString filePath = doc->url().toLocalFile();
     
     if (filePath.isEmpty()) {

@@ -194,14 +194,13 @@ void OpenAIProvider::chatStream(
     const std::vector<ToolDefinition> &tools,
     const QString &model,
     std::function<void(const QString &chunk)> onChunk,
-    std::function<void(const LLMResponse &final)> onDone,
-    std::function<void(const QString &error)> onError)
+                                std::function<void(const LLMResponse &final)> onDone,
+                                std::function<void(const QString &error)> onError)
 {
-    
     QJsonObject json;
     json["model"] = model;
     json["stream"] = true;
-    
+
     QJsonArray msgArray;
     for (const auto &msg : messages) {
         QJsonObject msgObj;
@@ -213,7 +212,7 @@ void OpenAIProvider::chatStream(
         msgArray.append(msgObj);
     }
     json["messages"] = msgArray;
-    
+
     if (!tools.empty()) {
         QJsonArray toolsArray;
         for (const auto &tool : tools) {
@@ -228,148 +227,108 @@ void OpenAIProvider::chatStream(
         }
         json["tools"] = toolsArray;
     }
-    
+
     QUrl url(m_baseUrl + "/chat/completions");
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
-    
+
     QByteArray payload = QJsonDocument(json).toJson();
-    
-    // Acquire rate limit semaphore (blocks if too many concurrent requests)
+
     m_rateLimitSemaphore.acquire();
-    
+
     QNetworkReply *reply = m_nam->post(request, payload);
     m_currentReply = reply;
-    
-    QObject::connect(reply, &QNetworkReply::finished, [this, reply, request, payload, onChunk, onDone, onError]() {
-        // Release semaphore when done
-        m_rateLimitSemaphore.release();
-        m_currentReply = nullptr;
-        
-        if (reply->error() == QNetworkReply::NoError) {
-            QByteArray responseData = reply->readAll();
-            if (responseData.isEmpty()) {
-                onError("Empty response from API");
-                reply->deleteLater();
-                return;
-            }
-            
-            // Parse SSE response line by line
-            QString responseText;
-            QString reasoningText;
-            QList<QByteArray> lines = responseData.split('\n');
-            for (const QByteArray &line : lines) {
-                if (line.startsWith("data: ")) {
-                    QByteArray jsonData = line.mid(6);
-                    if (jsonData.trimmed() == "[DONE]") {
-                        continue;
-                    }
-                    QJsonParseError parseError;
-                    QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
-                    if (parseError.error != QJsonParseError::NoError) {
-                        continue;
-                    }
-                    QJsonObject root = doc.object();
-                    if (root.contains("choices") && root["choices"].isArray()) {
-                        QJsonArray choices = root["choices"].toArray();
-                        if (!choices.isEmpty()) {
-                            QJsonObject choice = choices.at(0).toObject();
-                            QJsonObject delta = choice["delta"].toObject();
-                            QString content = delta["content"].toString();
-                            QString reasoningContent = delta["reasoning_content"].toString();
-                            // Remove pipe separators if present (fix for tokenized stream)
-                            content.remove("|");
-                            if (!reasoningContent.isEmpty()) {
-                                reasoningText += reasoningContent;
-                            }
-                            if (!content.isEmpty()) {
-                                responseText += content;
-                                if (onChunk) {
-                                    onChunk(content);
-                                }
-                            }
+
+    QString responseText;
+    QString reasoningText;
+    m_lineBuffer.clear();
+
+    bool readyReadConnected = QObject::connect(reply, &QNetworkReply::readyRead, [this, &responseText, &reasoningText, onChunk, reply]() {
+        if (reply->error() != QNetworkReply::NoError) return;
+
+        m_lineBuffer += reply->readAll();
+
+        while (true) {
+            int pos = m_lineBuffer.indexOf('\n');
+            if (pos == -1) break;
+
+            QByteArray line = m_lineBuffer.left(pos);
+            m_lineBuffer = m_lineBuffer.mid(pos + 1);
+
+            if (line.startsWith("data: ")) {
+                QByteArray jsonData = line.mid(6);
+                if (jsonData.trimmed() == "[DONE]") continue;
+
+                QJsonParseError parseError;
+                QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
+                if (parseError.error != QJsonParseError::NoError) continue;
+
+                QJsonObject root = doc.object();
+                if (root.contains("choices") && root["choices"].isArray()) {
+                    QJsonArray choices = root["choices"].toArray();
+                    if (!choices.isEmpty()) {
+                        QJsonObject choice = choices.at(0).toObject();
+                        QJsonObject delta = choice["delta"].toObject();
+                        QString content = delta["content"].toString();
+                        QString reasoningContent = delta["reasoning_content"].toString();
+
+                        if (!reasoningContent.isEmpty()) {
+                            reasoningText += reasoningContent;
+                        }
+                        if (!content.isEmpty()) {
+                            responseText += content;
+                            if (onChunk) onChunk(content);
                         }
                     }
                 }
             }
+        }
+    });
+
+    if (!readyReadConnected) {
+        onError("Failed to connect readyRead signal");
+        reply->deleteLater();
+        m_rateLimitSemaphore.release();
+        return;
+    }
+
+    QObject::connect(reply, &QNetworkReply::finished, [this, reply, &responseText, &reasoningText, onChunk, onDone, onError]() {
+        m_rateLimitSemaphore.release();
+        m_currentReply = nullptr;
+        m_lineBuffer.clear();
+        m_retryCount = 0;
+
+        // Process remaining buffered data
+        if (!m_lineBuffer.isEmpty()) {
+            QList<QByteArray> lines = m_lineBuffer.split('\n');
+            for (const QByteArray &line : lines) {
+                if (line.startsWith("data: ")) {
+                    QByteArray jsonData = line.mid(6);
+                    if (jsonData.trimmed() == "[DONE]") continue;
+                    QJsonParseError parseError;
+                    QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
+                    if (parseError.error != QJsonParseError::NoError) continue;
+                    QJsonObject root = doc.object();
+                    if (root.contains("choices") && root["choices"].isArray()) {
+                        QJsonArray choices = root["choices"].toArray();
+                        if (!choices.isEmpty()) {
+                            QJsonObject delta = choices.at(0).toObject()["delta"].toObject();
+                            QString content = delta["content"].toString();
+                            if (!content.isEmpty()) onChunk(content);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (reply->error() == QNetworkReply::NoError) {
             LLMResponse response;
-            response.thinking = reasoningText;
             response.content = responseText;
+            response.thinking = reasoningText;
             onDone(response);
         } else {
-            int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-            
-            // Check if we should retry (429 or 500 errors, max 3 retries)
-            bool shouldRetry = (statusCode == 429 || statusCode == 500) && m_retryCount < MAX_RETRIES;
-            
-            if (shouldRetry) {
-                m_retryCount++;
-                int delay = 2000 * m_retryCount;
-                
-                QNetworkRequest retryRequest = request;
-                QByteArray retryPayload = payload;
-                auto retryOnChunk = onChunk;
-                auto retryOnDone = onDone;
-                auto retryOnError = onError;
-                
-                QTimer::singleShot(delay, this, [this, retryRequest, retryPayload, retryOnChunk, retryOnDone, retryOnError]() {
-                    QNetworkReply *retryReply = m_nam->post(retryRequest, retryPayload);
-                    m_currentReply = retryReply;
-                    
-                    QObject::connect(retryReply, &QNetworkReply::finished, [this, retryReply, retryOnChunk, retryOnDone, retryOnError]() {
-                        m_currentReply = nullptr;
-                        m_retryCount = 0;
-                        if (retryReply->error() == QNetworkReply::NoError) {
-                            QByteArray responseData = retryReply->readAll();
-                            QString responseText;
-                            QString thinkingText;
-                            QList<QByteArray> lines = responseData.split('\n');
-                            for (const QByteArray &line : lines) {
-                                if (line.startsWith("data: ")) {
-                                    QByteArray jsonData = line.mid(6);
-                                    if (jsonData.trimmed() == "[DONE]") continue;
-                                    QJsonParseError parseError;
-                                    QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
-                                    if (parseError.error != QJsonParseError::NoError) continue;
-                                    QJsonObject root = doc.object();
-                                    if (root.contains("choices") && root["choices"].isArray()) {
-                                        QJsonArray choices = root["choices"].toArray();
-                                        if (!choices.isEmpty()) {
-                                            QJsonObject delta = choices.at(0).toObject()["delta"].toObject();
-                                            QString content = delta["content"].toString();
-                                            QString reasoningContent = delta["reasoning_content"].toString();
-                                            // Remove pipe separators if present (fix for tokenized stream)
-                                            content.remove("|");
-                                            if (!reasoningContent.isEmpty()) {
-                                                thinkingText += reasoningContent;
-                                            }
-                                            if (!content.isEmpty()) {
-                                                responseText += content;
-                                                if (retryOnChunk) retryOnChunk(content);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            LLMResponse response;
-                            response.content = responseText;
-                            retryOnDone(response);
-                        } else {
-                            retryOnError(retryReply->errorString());
-                        }
-                        retryReply->deleteLater();
-                    });
-                });
-                
-                reply->deleteLater();
-                return;
-            }
-            
-            m_retryCount = 0; // Reset on non-retryable error
-            QString err = reply->errorString();
-            QString errorWithUrl = QString("[%1] %2").arg(m_baseUrl).arg(err);
-            onError(errorWithUrl);
+            onError(reply->errorString());
         }
         reply->deleteLater();
     });
