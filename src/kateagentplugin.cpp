@@ -64,25 +64,7 @@ public:
         
         connect(toggleAction, &QAction::triggered, m_plugin, [this]() {
             if (!m_toolView) {
-                m_toolView = m_mainWindow->createToolView(
-                    m_plugin, 
-                    "agent_panel", 
-                    KTextEditor::MainWindow::Right, 
-                    QIcon::fromTheme("preferences-system"), 
-                    i18n("Kate Agent")
-                );
-                m_panel->setParent(m_toolView);
-                m_panel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-                if (auto *tvLayout = qobject_cast<QBoxLayout*>(m_toolView->layout())) {
-                    tvLayout->addWidget(m_panel, 1);
-                } else if (m_toolView->layout()) {
-                    m_toolView->layout()->addWidget(m_panel);
-                } else {
-                    QVBoxLayout *layout = new QVBoxLayout(m_toolView);
-                    layout->setContentsMargins(0, 0, 0, 0);
-                    layout->setSpacing(0);
-                    layout->addWidget(m_panel, 1);
-                }
+                createToolView();
             }
             
             if (m_toolView->isVisible()) {
@@ -107,25 +89,7 @@ public:
         // Auto-show tool view after event loop starts (deferred to avoid Kate init crash)
         QTimer::singleShot(0, this, [this]() {
             if (!m_toolView) {
-                m_toolView = m_mainWindow->createToolView(
-                    m_plugin, 
-                    "agent_panel", 
-                    KTextEditor::MainWindow::Right, 
-                    QIcon::fromTheme("preferences-system"), 
-                    i18n("Kate Agent")
-                );
-                m_panel->setParent(m_toolView);
-                m_panel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-                if (auto *tvLayout = qobject_cast<QBoxLayout*>(m_toolView->layout())) {
-                    tvLayout->addWidget(m_panel, 1);
-                } else if (m_toolView->layout()) {
-                    m_toolView->layout()->addWidget(m_panel);
-                } else {
-                    QVBoxLayout *layout = new QVBoxLayout(m_toolView);
-                    layout->setContentsMargins(0, 0, 0, 0);
-                    layout->setSpacing(0);
-                    layout->addWidget(m_panel, 1);
-                }
+                createToolView();
             }
             
             // Restore panel visibility state from Kate config (not JSON)
@@ -157,6 +121,28 @@ public:
     QWidget* panel() const { return m_panel; }
     
 private:
+    void createToolView() {
+        m_toolView = m_mainWindow->createToolView(
+            m_plugin, 
+            "agent_panel", 
+            KTextEditor::MainWindow::Right, 
+            QIcon::fromTheme("preferences-system"), 
+            i18n("Kate Agent")
+        );
+        m_panel->setParent(m_toolView);
+        m_panel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        if (auto *tvLayout = qobject_cast<QBoxLayout*>(m_toolView->layout())) {
+            tvLayout->addWidget(m_panel, 1);
+        } else if (m_toolView->layout()) {
+            m_toolView->layout()->addWidget(m_panel);
+        } else {
+            QVBoxLayout *layout = new QVBoxLayout(m_toolView);
+            layout->setContentsMargins(0, 0, 0, 0);
+            layout->setSpacing(0);
+            layout->addWidget(m_panel, 1);
+        }
+    }
+    
     KateAgentPlugin *m_plugin;
     KTextEditor::MainWindow *m_mainWindow;
     AgentPanel *m_panel;

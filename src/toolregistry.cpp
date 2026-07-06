@@ -31,14 +31,23 @@ QJsonObject ToolRegistry::executeTool(const QString &name, const QJsonObject &ar
         if (m_permissionManager && !m_permissionManager->isAllowed(name)) {
             // Request permission - this will emit signal for UI to show dialog
             m_permissionManager->requestPermission(name);
-            if (m_auditLogger) {
-                m_auditLogger->logPermissionDecision(name, false);
+            
+            // Re-check if permission was granted after user interaction
+            if (!m_permissionManager->isAllowed(name)) {
+                // Permission denied by user
+                if (m_auditLogger) {
+                    m_auditLogger->logPermissionDecision(name, false);
+                }
+                return QJsonObject{
+                    {"error", i18n("Permission denied for tool '%1'.", name)},
+                    {"success", false},
+                    {"requires_permission", true}
+                };
             }
-            return QJsonObject{
-                {"error", i18n("Permission required for tool '%1'. A dialog will appear for your approval.", name)},
-                {"success", false},
-                {"requires_permission", true}
-            };
+            // Permission granted - log and proceed
+            if (m_auditLogger) {
+                m_auditLogger->logPermissionDecision(name, true);
+            }
         }
         // If no permission manager or allowed, proceed
     }

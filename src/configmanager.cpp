@@ -1,31 +1,18 @@
 #include "configmanager.h"
 #include <KConfigGroup>
 #include <KSharedConfig>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QFile>
-#include <QDir>
 #include <QStandardPaths>
 
 ConfigManager::ConfigManager(QObject *parent)
     : QObject(parent)
-    , m_activeProvider("regolo")
-    , m_activeModel("qwen3-coder-next")
-    , m_maxIterations(20)
-    , m_temperature(0.7)
-    , m_maxTokens(4096)
+    , m_activeProvider(Defaults::ActiveProvider)
+    , m_activeModel(Defaults::ActiveModel)
+    , m_maxIterations(Defaults::MaxIterations)
+    , m_temperature(Defaults::Temperature)
+    , m_maxTokens(Defaults::MaxTokens)
 {
-    std::vector<ProviderConfig> providers;
-    ProviderConfig regolo;
-    regolo.type = "openai-compatible";
-    regolo.name = "regolo";
-    regolo.baseUrl = "https://api.regolo.ai/v1";
-    regolo.apiKey = "";
-    regolo.defaultModel = "qwen3-coder-next";
-    regolo.enabled = true;
-    providers.push_back(regolo);
-    m_providers = providers;
+    // No hardcoded providers - user must configure their own
+    m_providers.clear();
     
     m_systemPrompt = R"(
 You are an AI coding assistant integrated in the Kate text editor for KDE.
@@ -47,112 +34,61 @@ ConfigManager::~ConfigManager() = default;
 
 void ConfigManager::load()
 {
-    QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(configPath);
-    QFile file(configPath + "/config.json");
-
-    if (file.open(QIODevice::ReadOnly)) {
-        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-        file.close();
-
-        QJsonObject obj = doc.object();
-        m_activeProvider = obj["activeProvider"].toString("regolo");
-        m_activeModel = obj["activeModel"].toString("qwen3-coder-next");
-        m_maxIterations = obj["maxIterations"].toInt(20);
-        m_temperature = obj["temperature"].toDouble(0.7);
-        m_maxTokens = obj["maxTokens"].toInt(4096);
-        m_systemPrompt = obj["systemPrompt"].toString(m_systemPrompt);
-        
-        // Load panel visibility state
-        m_panelVisible = obj["panelVisible"].toBool(false);
-
-        m_providers.clear();
-        QJsonArray providers = obj["providers"].toArray();
-        for (const QJsonValue &val : providers) {
-            QJsonObject p = val.toObject();
-            ProviderConfig cfg;
-            cfg.type = p["type"].toString();
-            cfg.name = p["name"].toString();
-            cfg.baseUrl = p["baseUrl"].toString();
-            cfg.apiKey = p["apiKey"].toString();
-            cfg.defaultModel = p["defaultModel"].toString();
-            cfg.enabled = p["enabled"].toBool(false);
-            m_providers.push_back(cfg);
-        }
-    }
-
-    // Override with KDE config (kateagentrc) if present
     KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
-    QString kdeApiKey = group.readEntry("ApiKey", QString());
-    QString kdeBaseUrl = group.readEntry("BaseUrl", QString());
-    QString kdeModel = group.readEntry("Model", QString());
-    QString kdeSystemPrompt = group.readEntry("SystemPrompt", QString());
+    
+    // Load basic settings
+    m_activeProvider = group.readEntry("ActiveProvider", Defaults::ActiveProvider);
+    m_activeModel = group.readEntry("ActiveModel", Defaults::ActiveModel);
+    m_maxIterations = group.readEntry("MaxIterations", Defaults::MaxIterations);
+    m_temperature = group.readEntry("Temperature", Defaults::Temperature);
+    m_maxTokens = group.readEntry("MaxTokens", Defaults::MaxTokens);
+    m_systemPrompt = group.readEntry("SystemPrompt", m_systemPrompt);
+    m_panelVisible = group.readEntry("PanelVisible", false);
     m_bufferContextEnabled = group.readEntry("BufferContextEnabled", true);
-
-    if (!kdeBaseUrl.isEmpty()) {
-        for (auto &p : m_providers) {
-            if (p.name == m_activeProvider) {
-                if (!kdeBaseUrl.isEmpty()) p.baseUrl = kdeBaseUrl;
-                if (!kdeApiKey.isEmpty()) p.apiKey = kdeApiKey;
-                if (!kdeModel.isEmpty()) p.defaultModel = kdeModel;
-                break;
-            }
-        }
-        if (!kdeModel.isEmpty()) m_activeModel = kdeModel;
+    
+    // Load providers
+    m_providers.clear();
+    int providerCount = group.readEntry("ProviderCount", 0);
+    for (int i = 0; i < providerCount; i++) {
+        KConfigGroup providerGroup(KSharedConfig::openConfig(), QStringLiteral("Provider/%1").arg(i));
+        ProviderConfig cfg;
+        cfg.type = providerGroup.readEntry("Type", QString());
+        cfg.name = providerGroup.readEntry("Name", QString());
+        cfg.baseUrl = providerGroup.readEntry("BaseUrl", QString());
+        cfg.apiKey = providerGroup.readEntry("ApiKey", QString());
+        cfg.defaultModel = providerGroup.readEntry("DefaultModel", QString());
+        cfg.enabled = providerGroup.readEntry("Enabled", false);
+        m_providers.push_back(cfg);
     }
-    if (!kdeSystemPrompt.isEmpty()) m_systemPrompt = kdeSystemPrompt;
 }
 
 void ConfigManager::save()
 {
-    QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(configPath);
-    QFile file(configPath + "/config.json");
-    
-    if (!file.open(QIODevice::WriteOnly)) {
-        return;
-    }
-    
-    QJsonObject obj;
-    obj["activeProvider"] = m_activeProvider;
-    obj["activeModel"] = m_activeModel;
-    obj["maxIterations"] = m_maxIterations;
-    obj["temperature"] = m_temperature;
-    obj["maxTokens"] = m_maxTokens;
-    obj["systemPrompt"] = m_systemPrompt;
-    obj["panelVisible"] = m_panelVisible;
-    
-    QJsonArray providers;
-    for (const ProviderConfig &p : m_providers) {
-        QJsonObject pobj;
-        pobj["type"] = p.type;
-        pobj["name"] = p.name;
-        pobj["baseUrl"] = p.baseUrl;
-        pobj["apiKey"] = p.apiKey;
-        pobj["defaultModel"] = p.defaultModel;
-        pobj["enabled"] = p.enabled;
-        providers.append(pobj);
-    }
-    obj["providers"] = providers;
-    
-    file.write(QJsonDocument(obj).toJson());
-    file.close();
-    
-    // Also sync to KConfig to keep both storage backends in sync
     KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
-    if (!m_providers.empty()) {
-        for (const auto &p : m_providers) {
-            if (p.name == m_activeProvider) {
-                group.writeEntry("BaseUrl", p.baseUrl);
-                group.writeEntry("ApiKey", p.apiKey);
-                group.writeEntry("Model", p.defaultModel);
-                break;
-            }
-        }
-    }
-    group.writeEntry("Model", m_activeModel);
+    
+    // Save basic settings
+    group.writeEntry("ActiveProvider", m_activeProvider);
+    group.writeEntry("ActiveModel", m_activeModel);
+    group.writeEntry("MaxIterations", m_maxIterations);
+    group.writeEntry("Temperature", m_temperature);
+    group.writeEntry("MaxTokens", m_maxTokens);
     group.writeEntry("SystemPrompt", m_systemPrompt);
+    group.writeEntry("PanelVisible", m_panelVisible);
     group.writeEntry("BufferContextEnabled", m_bufferContextEnabled);
+    
+    // Save providers
+    group.writeEntry("ProviderCount", static_cast<int>(m_providers.size()));
+    for (size_t i = 0; i < m_providers.size(); i++) {
+        KConfigGroup providerGroup(KSharedConfig::openConfig(), QStringLiteral("Provider/%1").arg(i));
+        const auto &p = m_providers[i];
+        providerGroup.writeEntry("Type", p.type);
+        providerGroup.writeEntry("Name", p.name);
+        providerGroup.writeEntry("BaseUrl", p.baseUrl);
+        providerGroup.writeEntry("ApiKey", p.apiKey);
+        providerGroup.writeEntry("DefaultModel", p.defaultModel);
+        providerGroup.writeEntry("Enabled", p.enabled);
+    }
+    
     group.sync();
 }
 

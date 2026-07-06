@@ -14,7 +14,6 @@
 
 #include "threadview.h"
 #include "inputbar.h"
-#include "../threadstorage.h"
 
 class AgentLoop;
 class ToolRegistry;
@@ -136,7 +135,6 @@ private:
     PermissionManager *m_permissions;
     CloseableTabWidget *m_tabs = nullptr;
     InputBar *m_inputBar;
-    ThreadStorage *m_threadStorage;
     int m_chatCounter;
     QString m_activeThreadId;  // Thread currently receiving responses
     QString m_currentThreadId;

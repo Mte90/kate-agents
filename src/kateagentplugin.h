@@ -66,4 +66,22 @@ private:
     friend class AgentConfigPage;
 };
 
+// Forward declaration for AgentGuiClient private method
+class AgentGuiClient : public QObject, public KXMLGUIClient
+{
+    Q_OBJECT
+public:
+    AgentGuiClient(KateAgentPlugin *plugin, KTextEditor::MainWindow *mainwindow);
+    ~AgentGuiClient() override;
+    QWidget* panel() const;
+    
+private:
+    void createToolView();
+    
+    KateAgentPlugin *m_plugin;
+    KTextEditor::MainWindow *m_mainWindow;
+    AgentPanel *m_panel;
+    QWidget *m_toolView = nullptr;
+};
+
 #endif

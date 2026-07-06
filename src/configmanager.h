@@ -6,6 +6,21 @@
 #include <QStringList>
 #include <vector>
 
+// Centralized default values - configurable via config file
+namespace Defaults {
+    inline const QString ActiveProvider = QString();  // Empty - user must configure
+    inline const QString ActiveModel = QString();     // Empty - user must configure
+    inline const QString ProviderType = QString();    // Empty - user must configure
+    inline const QString ProviderName = QString();    // Empty - user must configure
+    inline const QString BaseUrl = QString();         // Empty - user must configure
+    inline const QString DefaultModel = QString();    // Empty - user must configure
+    inline const int MaxIterations = 20;
+    inline const double Temperature = 0.7;
+    inline const int MaxTokens = 4096;
+    inline const bool BufferContextEnabled = true;
+    inline const bool PanelVisible = false;
+}
+
 struct ProviderConfig {
     QString type;
     QString name;

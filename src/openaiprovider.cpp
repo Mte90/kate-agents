@@ -34,7 +34,7 @@ QStringList OpenAIProvider::availableModels()
     // Fetch models from the API (synchronous for now)
     // In a real implementation, this should be async
     if (m_baseUrl.isEmpty() || m_apiKey.isEmpty()) {
-        return QStringList() << "qwen3-coder-next";
+        return QStringList();  // Empty - user must configure
     }
     
     QUrl modelsUrl(m_baseUrl + "/models");
@@ -76,117 +76,26 @@ QStringList OpenAIProvider::availableModels()
             }
         }
         
-        return models.isEmpty() ? QStringList() << "qwen3-coder-next" : models;
+        return models;  // Return empty if no models from API
     }
     
-    return QStringList() << "qwen3-coder-next";
+    return QStringList();  // Empty - user must configure
 }
 
-QFuture<LLMResponse> OpenAIProvider::chat(
-    const std::vector<LLMMessage> &messages,
-    const std::vector<ToolDefinition> &tools,
-    const QString &model,
-    double temperature)
+QJsonArray OpenAIProvider::buildToolsJson(const std::vector<ToolDefinition> &tools)
 {
-    QPromise<LLMResponse> *promise = new QPromise<LLMResponse>();
-    QFuture<LLMResponse> future = promise->future();
-    
-    QJsonObject json;
-    json["model"] = model;
-    json["temperature"] = temperature;
-    
-    QJsonArray msgArray;
-    for (const auto &msg : messages) {
-        QJsonObject msgObj;
-        msgObj["role"] = msg.role;
-        msgObj["content"] = msg.content;
-        if (!msg.toolCallId.isEmpty()) {
-            msgObj["tool_call_id"] = msg.toolCallId;
-        }
-        msgArray.append(msgObj);
+    QJsonArray toolsArray;
+    for (const auto &tool : tools) {
+        QJsonObject toolObj;
+        toolObj["type"] = tool.type;
+        QJsonObject funcObj;
+        funcObj["name"] = tool.function.name;
+        funcObj["description"] = tool.function.description;
+        funcObj["parameters"] = tool.function.parameters;
+        toolObj["function"] = funcObj;
+        toolsArray.append(toolObj);
     }
-    json["messages"] = msgArray;
-    
-    if (!tools.empty()) {
-        QJsonArray toolsArray;
-        for (const auto &tool : tools) {
-            QJsonObject toolObj;
-            toolObj["type"] = tool.type;
-            QJsonObject funcObj;
-            funcObj["name"] = tool.function.name;
-            funcObj["description"] = tool.function.description;
-            funcObj["parameters"] = tool.function.parameters;
-            toolObj["function"] = funcObj;
-            toolsArray.append(toolObj);
-        }
-        json["tools"] = toolsArray;
-    }
-    
-    QUrl url(m_baseUrl + "/chat/completions");
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
-    
-    QString jsonStr = QJsonDocument(json).toJson(QJsonDocument::Indented);
-    
-    QNetworkReply *reply = m_nam->post(request, QJsonDocument(json).toJson());
-    m_currentReply = reply;
-    
-    QObject::connect(reply, &QNetworkReply::finished, [this, promise, reply]() {
-        m_currentReply = nullptr;
-        
-        if (reply->error() == QNetworkReply::NoError) {
-QByteArray responseData = reply->readAll();
-            LLMResponse response;
-            QJsonDocument doc = QJsonDocument::fromJson(responseData);
-            QJsonObject root = doc.object();
-            
-            if (root.contains("choices") && root["choices"].isArray()) {
-                QJsonArray choices = root["choices"].toArray();
-                if (!choices.isEmpty()) {
-                    QJsonObject choice = choices.at(0).toObject();
-                    QJsonObject message = choice["message"].toObject();
-                    
-                    response.content = message["content"].toString();
-                    response.finishReason = choice["finish_reason"].toString();
-                    
-                    if (message.contains("tool_calls") && message["tool_calls"].isArray()) {
-                        QJsonArray tcArray = message["tool_calls"].toArray();
-                        for (const auto &tc : tcArray) {
-                            QJsonObject tcObj = tc.toObject();
-                            ToolCall call;
-                            call.id = tcObj["id"].toString();
-                            call.name = tcObj["function"].toObject()["name"].toString();
-                            call.arguments = tcObj["function"].toObject()["arguments"].toObject();
-                            response.toolCalls.push_back(call);
-                        }
-                    }
-                }
-            }
-            promise->addResult(response);
-        } else {
-            int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-            QString error;
-            if (statusCode == 401) {
-                error = i18n("Authentication failed: Invalid API key or missing authentication");
-            } else if (statusCode == 403) {
-                error = i18n("Access forbidden: Check your API key and permissions");
-            } else if (statusCode == 404) {
-                error = i18n("Endpoint not found: Check your base URL");
-            } else {
-                error = reply->errorString();
-            }
-            // OpenAIProvider chat error: << error
-            LLMResponse errResponse;
-            errResponse.content = error;
-            errResponse.finishReason = "error";
-            promise->addResult(errResponse);
-        }
-        reply->deleteLater();
-        delete promise;
-    });
-    
-    return future;
+    return toolsArray;
 }
 
 void OpenAIProvider::chatStream(
@@ -214,18 +123,7 @@ void OpenAIProvider::chatStream(
     json["messages"] = msgArray;
 
     if (!tools.empty()) {
-        QJsonArray toolsArray;
-        for (const auto &tool : tools) {
-            QJsonObject toolObj;
-            toolObj["type"] = tool.type;
-            QJsonObject funcObj;
-            funcObj["name"] = tool.function.name;
-            funcObj["description"] = tool.function.description;
-            funcObj["parameters"] = tool.function.parameters;
-            toolObj["function"] = funcObj;
-            toolsArray.append(toolObj);
-        }
-        json["tools"] = toolsArray;
+        json["tools"] = buildToolsJson(tools);
     }
 
     QUrl url(m_baseUrl + "/chat/completions");

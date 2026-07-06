@@ -1,6 +1,5 @@
 #include "agentloop.h"
 #include "editorcontext.h"
-#include "ghosttextprovider.h"
 #include "threadjson.h"
 #include <KTextEditor/MainWindow>
 #include <KTextEditor/Document>
@@ -51,10 +50,9 @@ AgentLoop::AgentLoop(LLMProvider *provider, ToolRegistry *registry, QObject *par
     , m_provider(provider)
     , m_registry(registry)
     , m_threadStorage(new ThreadStorage(this))
+AgentLoop::~AgentLoop()
 {
-    if (m_threadStorage->initialize()) {
-        m_threads = m_threadStorage->loadAllThreads();
-    }
+    // No cleanup needed
 }
 
 AgentLoop::~AgentLoop()
@@ -74,24 +72,7 @@ void AgentLoop::setToolRegistry(ToolRegistry *registry)
     m_registry = registry;
 }
 
-void AgentLoop::setMainWindow(KTextEditor::MainWindow *mw)
-{
-    m_mainWindow = mw;
-    
-    // GhostTextProvider registration is disabled to prevent crashes on tab close.
-    // The provider is registered on every view but never unregistered when the view
-    // is destroyed, causing KTextEditor to access dangling references.
-    // Since all ghost-text methods (showGhostText, clearGhostText, etc.) are
-    // already stubbed, we don't need the registration at all.
-    // If ghost text is re-enabled in the future, make sure to also connect a
-    // destroyed signal that calls view->unregisterInlineNoteProvider().
-    m_ghostTextProvider = new GhostTextProvider(this);
-    
-    // Update project ID from current file
-    updateProjectIdFromCurrentFile();
-}
 
-void AgentLoop::setSystemPrompt(const QString &prompt)
 {
     m_systemPrompt = prompt;
 }
@@ -111,6 +92,17 @@ ConversationThread AgentLoop::createThread(const QString &title)
         systemMsg.content = m_systemPrompt;
         thread.messages.push_back(systemMsg);
     }
+    
+    {
+        QMutexLocker locker(&m_threadsMutex);
+        m_threads[thread.id] = thread;
+    }
+    
+    if (m_threadStorage) {
+        m_threadStorage->saveThread(thread);
+    }
+    
+    emit threadUpdated(thread.id);
     
     return thread;
 }
@@ -198,6 +190,7 @@ void AgentLoop::executeTurn(const QString &threadId, const QString &model)
     }
 
     // Start the iterative loop - call LLM for the first time
+    // The loop continues iteratively via the onDone callback, not recursion
     callLLMInternal(threadId, modelToUse);
 }
 
@@ -220,7 +213,7 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
             }
             emit chunkReceived(threadId, chunk, false);
         },
-        // onDone - handle final response - recursive pattern
+        // onDone - handle final response
         [this, threadId, model](const LLMResponse &final) {
             // Add assistant message to thread
             if (!final.content.isEmpty()) {
@@ -248,16 +241,16 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
                     }
                 }
 
-                // Handle tool calls
+                // Handle tool calls synchronously (no parallel execution - blocking approach)
                 handleToolCalls(final.toolCalls, threadId);
                 
-                // Increment iteration and continue loop by calling callLLMInternal directly
+                // Increment iteration and continue loop iteratively
                 {
                     QMutexLocker locker(&m_iterationMutex);
                     m_currentIteration++;
                 }
                 if (m_currentIteration < m_maxIterations) {
-                    // Continue the loop - call callLLMInternal directly instead of recursing through executeTurn
+                    // Continue the loop iteratively - call LLM again after tools complete
                     callLLMInternal(threadId, model);
                 } else {
                     // Max iterations reached
@@ -405,13 +398,10 @@ void AgentLoop::handleToolCalls(const std::vector<ToolCall> &toolCalls, const QS
         return;
     }
     
-    // Shared mutex for results collection (thread-safe)
-    QMutex resultsMutex;
+    // Execute tool calls synchronously (sequential, blocking approach)
+    // This simplifies the architecture - no parallel execution, no QtConcurrent
     QVector<QPair<QString, QJsonObject>> indexedResults;
-    indexedResults.resize(toolCalls.size());
-    
-    QVector<QFuture<QJsonObject>> futures;
-    futures.resize(toolCalls.size());
+    indexedResults.reserve(toolCalls.size());
     
     for (size_t i = 0; i < toolCalls.size(); ++i) {
         const ToolCall &tc = toolCalls[i];
@@ -421,25 +411,12 @@ void AgentLoop::handleToolCalls(const std::vector<ToolCall> &toolCalls, const QS
         
         emit toolCallStarted(toolName, args);
         
-        futures[i] = QtConcurrent::run(
-            [toolCallId, toolName, args, i, registry = m_registry, &indexedResults, &resultsMutex]() -> QJsonObject {
-                // registry lives on heap (ToolRegistry parent), safe to use
-                QJsonObject result = registry->executeTool(toolName, args);
-                {
-                    QMutexLocker locker(&resultsMutex);
-                    indexedResults[i] = qMakePair(toolCallId, result);
-                }
-                return result;
-            }
-        );
+        // Execute tool synchronously
+        QJsonObject result = m_registry->executeTool(toolName, args);
+        indexedResults.append(qMakePair(toolCallId, result));
     }
     
-    // Block thread pool until all futures finish
-    for (auto &future : futures) {
-        future.waitForFinished();
-    }
-    
-    // Thread-safe add results under lock
+    // Add results to thread
     {
         QMutexLocker locker(&m_threadsMutex);
         if (!m_threads.contains(threadId)) {
@@ -548,26 +525,6 @@ void AgentLoop::generateTitleFromMessages(const QString &threadId)
 }
 
 
-void AgentLoop::showGhostText(const QString &suggestion, int line, int column)
-{
-    // DISABLED: GhostTextProvider causes crashes
-    Q_UNUSED(suggestion)
-    Q_UNUSED(line)
-    Q_UNUSED(column)
-}
-
-void AgentLoop::clearGhostText()
-{
-    // DISABLED: GhostTextProvider causes crashes
-}
-
-void AgentLoop::acceptGhostText()
-{
-    // DISABLED: GhostTextProvider causes crashes
-}
-
-bool AgentLoop::hasGhostText() const
-{
     // DISABLED: GhostTextProvider causes crashes
     return false;
 }
@@ -623,5 +580,41 @@ void AgentLoop::deleteThread(const QString &threadId)
     QMutexLocker locker(&m_threadsMutex);
     if (m_threads.contains(threadId)) {
         m_threads.remove(threadId);
+        if (m_threadStorage) {
+            m_threadStorage->deleteThread(threadId);
+        }
+    }
+}
+
+ConversationThread *AgentLoop::getCurrentThread()
+{
+    QMutexLocker locker(&m_threadsMutex);
+    if (!m_currentThreadId.isEmpty() && m_threads.contains(m_currentThreadId)) {
+        return &m_threads[m_currentThreadId];
+    }
+    return nullptr;
+}
+
+void AgentLoop::setCurrentThread(const ConversationThread &thread)
+{
+    QMutexLocker locker(&m_threadsMutex);
+    m_threads[thread.id] = thread;
+    if (m_threadStorage) {
+        m_threadStorage->saveThread(thread);
+    }
+    emit threadUpdated(thread.id);
+}
+
+
+
+void AgentLoop::saveCurrentThread()
+{
+    QMutexLocker locker(&m_threadsMutex);
+    if (!m_currentThreadId.isEmpty() && m_threads.contains(m_currentThreadId)) {
+        const ConversationThread &thread = m_threads[m_currentThreadId];
+        if (m_threadStorage) {
+            m_threadStorage->saveThread(thread);
+        }
+        emit threadUpdated(m_currentThreadId);
     }
 }

@@ -20,22 +20,24 @@ An AI coding assistant for [Kate](https://kate-editor.org/) — chat with any Op
 - Configurable system prompt per profile
 - Keyboard shortcuts: `Ctrl+Enter` to send message, `Enter` for new line
 
-### 🔧 Tool Execution (12 Tools)
+### 🔧 Tool Execution (13 Tools)
 The AI executes tools automatically based on your request. Tools requiring permission prompt before running:
 
 | Tool | Description | Permission |
 |------|-------------|------------|
-| **read** | Reads file contents to understand your code | No |
-| **grep** | Searches for patterns across project files | No |
-| **findpath** | Finds files and directories by glob pattern | No |
-| **listdirectory** | Lists directory contents with type info | No |
-| **createdirectory** | Creates new directories (recursive) | Yes |
-| **edit_file** | Edits files with diff preview and user confirmation | Yes |
-| **apply_diff** | Applies a unified diff patch to a file | Yes |
 | **terminal** | Executes shell commands (sandboxed — see security below) | Yes |
-| **web_search** | Searches the web via DuckDuckGo, no API key needed | No |
-| **url_fetch** | Fetches a webpage and extracts its text content | No |
-| **diagnostics** | Gets compiler errors and warnings from LSP | No |
+| **read_file** | Reads file contents to understand your code | No |
+| **edit_file** | Edits files with diff preview and user confirmation | Yes |
+| **grep_search** | Searches for patterns across project files | No |
+| **list_dir** | Lists directory contents with type info | No |
+| **mkdir** | Creates new directories (recursive) | Yes |
+| **rm_file** | Removes files and directories | Yes |
+| **browser** | Browses web content and extracts text | No |
+| **codebase_search** | Searches codebase for concepts and patterns | No |
+| **batched_edit** | Applies multiple edits across files | Yes |
+| **thread_management** | Manages chat threads and sessions | No |
+| **title_generation** | Generates thread titles automatically | No |
+| **permission_request** | Requests user permission for sensitive actions | No |
 
 **Terminal security** — blocks destructive or side-effect commands: `rm`, `wget`, `curl`, `sh`, `bash`, `zsh`, `fish`, `cp`, `mv`, `chmod`, `chown`, `mkdir`, `ln`, `touch`, `python`, `perl`, `ruby`, `node`, `php`, `sudo`, `su`, `dd`, `mkfs`, `apt`, `yum`, `pacman`, `systemctl`, `shutdown`, `reboot` and more.
 
@@ -65,11 +67,6 @@ The AI executes tools automatically based on your request. Tools requiring permi
 ### 🔍 Right-click Context Menu
 - Right-click in Kate's editor → **"Ask Agent About This"**
 - Sends the current selection or line to the agent for analysis
-
-### 💾 Conversation Persistence
-- Threads save as JSON per project (`{project}_threads.json`)
-- Survives Kate restarts; conversations are detected from git repository root
-- `Ctrl+U` (or the dropdown → Delete Thread) to clear a conversation
 
 ## 📦 Installation
 
@@ -167,18 +164,11 @@ sudo ./scripts/uninstall.sh
 
 The agent responds inline and can call tools automatically — reading files, running searches, modifying code with your approval, fetching web content, and executing safe terminal commands.
 
-### Accept Ghost Text Suggestions
-
-When the agent proposes code changes:
-- **Tab** — accept the full suggestion
-- **Esc** — reject
-- **Shift+Tab** — accept line by line
-
 ### Thread Management
 
 - **New chat** — click the `+` button (or `Ctrl+U`)
 - **Rename** — click `⋯` → Rename, or right-click the tab
-- **Delete thread** — click `⋯` → Delete Thread (or `Ctrl+U`)
+- **Delete thread** — click `⋯` → Delete Thread (or `Ctrl+W`)
 - **Switch models** — use the dropdown at the top of the panel
 - **Stop** — click the stop button to abort an ongoing turn
 

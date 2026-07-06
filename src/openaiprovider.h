@@ -20,12 +20,6 @@ public:
     bool isAvailable() override;
     QStringList availableModels() override;
 
-    QFuture<LLMResponse> chat(
-        const std::vector<LLMMessage> &messages,
-        const std::vector<ToolDefinition> &tools,
-        const QString &model,
-        double temperature = 0.7
-    ) override;
 
     void chatStream(
         const std::vector<LLMMessage> &messages,
@@ -48,6 +42,7 @@ public:
     }
 
 private:
+    QJsonArray buildToolsJson(const std::vector<ToolDefinition> &tools);
     QString m_name;
     QString m_baseUrl;
     QString m_apiKey;

@@ -32,18 +32,13 @@ AgentPanel::AgentPanel(AgentLoop *agent, ToolRegistry *registry,
     , m_permissions(permissions)
     , m_tabs(nullptr)
     , m_inputBar(nullptr)
-    , m_threadStorage(new ThreadStorage(this))
     , m_chatCounter(0)
     , m_currentThreadId()
 {
     setupUi();
     
-    if (m_threadStorage) {
-        m_threadStorage->initialize();
-    }
-
     connectSignals();
-
+    
     loadExistingThreads();
 }
 
@@ -277,24 +272,18 @@ void AgentPanel::saveCurrentThread()
     }
     
     if (m_agent) {
-        QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
-        
-        ConversationThread currentThread;
-        if (threads.contains(m_currentThreadId)) {
-            currentThread = threads[m_currentThreadId];
-        } else {
-            currentThread.id = m_currentThreadId;
-        }
-        currentThread.title = m_tabs->tabText(currentIndex);
-        
-        m_threadStorage->saveThread(currentThread);
-        
+        // Use AgentLoop as the single source of truth
+        m_agent->saveCurrentThread();
     }
 }
 
 void AgentPanel::loadExistingThreads()
 {
-    QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
+    // Use AgentLoop as the single source of truth
+    QMap<QString, ConversationThread> threads;
+    if (m_agent) {
+        threads = m_agent->getThreads();
+    }
     
     // Track max counter from existing threads
     QRegularExpression counterPattern("chat_\\d+_(\\d+)");
@@ -425,20 +414,20 @@ void AgentPanel::onSendMessage(const QString &message)
     }
     
     // Ensure the thread has the current model selected in the dropdown
-    if (m_provider && m_threadStorage) {
+    if (m_provider && m_agent) {
         QString currentModel = m_inputBar->currentModel();
         if (!currentModel.isEmpty()) {
+            // Get thread from AgentLoop (single source of truth)
+            auto threads = m_agent->getThreads();
             ConversationThread thread;
-            thread.id = m_currentThreadId;
-            if (m_threadStorage) {
-                QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
-                if (threads.contains(m_currentThreadId)) {
-                    thread = threads[m_currentThreadId];
-                }
+            if (threads.contains(m_currentThreadId)) {
+                thread = threads[m_currentThreadId];
+            } else {
+                thread.id = m_currentThreadId;
             }
             if (thread.currentModel != currentModel) {
                 thread.currentModel = currentModel;
-                m_threadStorage->saveThread(thread);
+                m_agent->setCurrentThread(thread);
             }
         }
     }
@@ -475,19 +464,17 @@ void AgentPanel::onModelChanged(const QString &model)
 {
     m_config->setActiveModel(model);
     
-    // Also update the current thread's model
-    if (!m_currentThreadId.isEmpty() && m_threadStorage) {
+    // Also update the current thread's model via AgentLoop
+    if (!m_currentThreadId.isEmpty() && m_agent) {
+        auto threads = m_agent->getThreads();
         ConversationThread thread;
-        thread.id = m_currentThreadId;
-        if (m_threadStorage) {
-            QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
-            if (threads.contains(m_currentThreadId)) {
-                thread = threads[m_currentThreadId];
-            }
+        if (threads.contains(m_currentThreadId)) {
+            thread = threads[m_currentThreadId];
+        } else {
+            thread.id = m_currentThreadId;
         }
         thread.currentModel = model;
-        // Save the updated thread (pass the whole object)
-        m_threadStorage->saveThread(thread);
+        m_agent->setCurrentThread(thread);
     }
 }
 
@@ -605,12 +592,12 @@ void AgentPanel::onTitleGenerated(const QString &threadId, const QString &title)
     int index = m_tabHash.value(threadId, -1);
     if (index >= 0) {
         updateTabTitle(index, title);
-        // Update thread title in persistent storage
-        if (m_threadStorage) {
-            QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
+        // Update thread title via AgentLoop (single source of truth)
+        if (m_agent) {
+            auto threads = m_agent->getThreads();
             if (threads.contains(threadId)) {
                 threads[threadId].title = title;
-                m_threadStorage->saveThread(threads[threadId]);
+                m_agent->setCurrentThread(threads[threadId]);
             }
         }
     }
@@ -680,10 +667,12 @@ void AgentPanel::reloadModels()
 
 void AgentPanel::onThreadUpdated(const QString &threadId)
 {
-    if (!m_threadStorage || threadId.isEmpty()) {
+    if (!m_agent || threadId.isEmpty()) {
         return;
     }
-    QMap<QString, ConversationThread> threads = m_threadStorage->loadAllThreads();
+    
+    // Get thread from AgentLoop (single source of truth)
+    auto threads = m_agent->getThreads();
     if (!threads.contains(threadId)) {
         return;
     }

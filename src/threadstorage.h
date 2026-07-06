@@ -18,8 +18,7 @@ public:
     ~ThreadStorage() override;
 
     bool initialize();
-    QMap<QString, ConversationThread> loadAllThreads();
-    QMap<QString, ConversationThread> loadThreadsForProject(const QString &projectId);
+    QMap<QString, ConversationThread> loadAllThreads(const QString &projectId = QString());
     bool saveThread(const ConversationThread &thread);
     bool saveAllThreads(const QMap<QString, ConversationThread> &threads);
     bool deleteThread(const QString &threadId);

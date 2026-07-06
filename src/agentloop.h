@@ -14,8 +14,6 @@
 #include <QMutex>
 #include <QMetaEnum>
 
-class GhostTextProvider;
-
 enum class AgentProfile { Write, Ask, Minimal };
 QString systemPromptForProfile(AgentProfile profile);
 AgentProfile stringToProfile(const QString &str);
@@ -36,11 +34,6 @@ public:
     void setProvider(LLMProvider *provider);
     void setToolRegistry(ToolRegistry *registry);
     void setMainWindow(KTextEditor::MainWindow *mw);
-    void showGhostText(const QString &suggestion, int line, int column);
-    void clearGhostText();
-    void acceptGhostText();
-    bool hasGhostText() const;
-
     ConversationThread createThread(const QString &title = QString());
     void addUserMessage(const QString &threadId, const QString &content, const QString &profile = QString());
     void executeTurn(const QString &threadId, const QString &model = QString());
@@ -56,7 +49,12 @@ public:
     void generateTitleFromMessages(const QString &threadId);
     void deleteMessage(const QString &threadId, int index);
     void deleteThread(const QString &threadId);
+    
+    // Thread access methods - AgentLoop is the single source of truth
     QMap<QString, ConversationThread> &getThreads() { return m_threads; }
+    ConversationThread *getCurrentThread();
+    void setCurrentThread(const ConversationThread &thread);
+    void saveCurrentThread();
 
     signals:
         void responseStarted();
@@ -93,8 +91,12 @@ private:
     QString m_currentThreadId;
     QMap<QString, ConversationThread> m_threads;
     std::vector<LLMMessage> m_currentRequest;
+    int m_currentIteration = 0;
+    bool m_isRunning = false;
+    QString m_currentThreadId;
+    QMap<QString, ConversationThread> m_threads;
+    std::vector<LLMMessage> m_currentRequest;
     std::vector<ToolDefinition> m_currentTools;
-    GhostTextProvider *m_ghostTextProvider = nullptr;
     };
     
     #endif
