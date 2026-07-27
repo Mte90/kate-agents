@@ -3,6 +3,7 @@
  */
 
 #include <QTest>
+#include <QStandardPaths>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QFile>
@@ -41,7 +42,7 @@ void testPanelVisibleJsonRoundtrip()
     QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QFile file(configPath + "/test_panel_config.json");
     
-    file.open(QIODevice::WriteOnly);
+    QVERIFY(file.open(QIODevice::WriteOnly));
     {
         QJsonObject obj;
         obj["panelVisible"] = true;
@@ -51,7 +52,7 @@ void testPanelVisibleJsonRoundtrip()
     }
     file.close();
     
-    file.open(QIODevice::ReadOnly);
+    QVERIFY(file.open(QIODevice::ReadOnly));
     {
         QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
         QJsonObject obj = doc.object();
@@ -149,7 +150,7 @@ void testPanelVisibleToggleAndExit()
     QFile file(configPath + "/config.json");
     QVERIFY(file.exists());
     
-    file.open(QIODevice::ReadOnly);
+    QVERIFY(file.open(QIODevice::ReadOnly));
     QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
     QJsonObject obj = doc.object();
     QCOMPARE(obj["panelVisible"].toBool(false), true);
@@ -161,7 +162,7 @@ void testPanelVisibleToggleAndExit()
     QCOMPARE(config.panelVisible(), false);
     
     // Verify it was saved to file
-    file.open(QIODevice::ReadOnly);
+    QVERIFY(file.open(QIODevice::ReadOnly));
     doc = QJsonDocument::fromJson(file.readAll());
     obj = doc.object();
     QCOMPARE(obj["panelVisible"].toBool(true), false);
@@ -193,7 +194,7 @@ void testPanelVisibleExitWithoutToggle()
     
     QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QFile file(configPath + "/config.json");
-    file.open(QIODevice::ReadOnly);
+    QVERIFY(file.open(QIODevice::ReadOnly));
     QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
     QJsonObject obj = doc.object();
     QCOMPARE(obj["panelVisible"].toBool(false), true);

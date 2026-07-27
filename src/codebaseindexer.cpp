@@ -175,27 +175,27 @@ QStringList CodebaseIndexer::supportedExtensions() const
 
 QVector<CodeSnippet> CodebaseIndexer::searchSymbols(const QString &query) const
 {
-    QMutexLocker locker(&m_mutex);
-    QVector<CodeSnippet> results;
-    
     QString lowerQuery = query.toLower();
-    for (const CodeSnippet &snippet : m_symbols) {
-        if (snippet.symbolName.toLower().contains(lowerQuery)) {
-            results.append(snippet);
-        }
-    }
-    
-    return results;
+    return searchByPredicate(query, [&lowerQuery](const CodeSnippet &snippet) {
+        return snippet.symbolName.toLower().contains(lowerQuery);
+    });
 }
 
 QVector<CodeSnippet> CodebaseIndexer::searchContent(const QString &query) const
 {
+    QString lowerQuery = query.toLower();
+    return searchByPredicate(query, [&lowerQuery](const CodeSnippet &snippet) {
+        return snippet.content.toLower().contains(lowerQuery);
+    });
+}
+
+QVector<CodeSnippet> CodebaseIndexer::searchByPredicate(const QString &query, std::function<bool(const CodeSnippet&)> predicate) const
+{
     QMutexLocker locker(&m_mutex);
     QVector<CodeSnippet> results;
     
-    QString lowerQuery = query.toLower();
     for (const CodeSnippet &snippet : m_symbols) {
-        if (snippet.content.toLower().contains(lowerQuery)) {
+        if (predicate(snippet)) {
             results.append(snippet);
         }
     }

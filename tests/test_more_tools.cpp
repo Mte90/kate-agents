@@ -107,7 +107,7 @@ private slots:
     {
         QString testFile = "/tmp/test_edit_file.txt";
         QFile file(testFile);
-        file.open(QIODevice::WriteOnly);
+        QVERIFY(file.open(QIODevice::WriteOnly));
         file.write("hello world");
         file.close();
         

@@ -13,135 +13,113 @@ private slots:
         QVERIFY(true);
     }
 
-    void testDefaultApiKeyEmpty()
+    void testDefaultActiveProviderEmpty()
     {
         ConfigManager cm;
-        QVERIFY(cm.apiKey().isEmpty());
+        QVERIFY(cm.getActiveProvider().isEmpty());
     }
 
-    void testDefaultBaseUrl()
+    void testDefaultActiveModelEmpty()
     {
         ConfigManager cm;
-        QVERIFY(!cm.baseUrl().isEmpty());
+        QVERIFY(cm.getActiveModel().isEmpty());
     }
 
-    void testSetApiKey()
+    void testSetActiveProvider()
     {
         ConfigManager cm;
-        cm.setApiKey("test-key-123");
-        QVERIFY(cm.apiKey() == "test-key-123");
+        cm.setActiveProvider("test-provider-123");
+        QVERIFY(cm.getActiveProvider() == "test-provider-123");
     }
 
-    void testSetBaseUrl()
+    void testSetActiveModel()
     {
         ConfigManager cm;
-        cm.setBaseUrl("http://localhost:8080");
-        QVERIFY(cm.baseUrl() == "http://localhost:8080");
+        cm.setActiveModel("gpt-4");
+        QVERIFY(cm.getActiveModel() == "gpt-4");
     }
 
-    void testSetModel()
+    void testDefaultModelEmpty()
     {
         ConfigManager cm;
-        cm.setModel("gpt-4");
-        QVERIFY(cm.model() == "gpt-4");
+        QVERIFY(cm.getActiveModel().isEmpty());
     }
 
-    void testDefaultModel()
+    void testSystemPromptEmptyByDefault()
     {
         ConfigManager cm;
-        QVERIFY(!cm.model().isEmpty());
-    }
-
-    void testSystemPrompt()
-    {
-        ConfigManager cm;
-        QVERIFY(!cm.systemPrompt().isEmpty());
+        QVERIFY(cm.getSystemPrompt().isEmpty());
     }
 
     void testSetSystemPrompt()
     {
         ConfigManager cm;
         cm.setSystemPrompt("Custom prompt");
-        QVERIFY(cm.systemPrompt() == "Custom prompt");
+        QVERIFY(cm.getSystemPrompt() == "Custom prompt");
     }
 
     void testTemperature()
     {
         ConfigManager cm;
-        QVERIFY(cm.temperature() > 0.0);
+        QVERIFY(cm.getTemperature() > 0.0);
     }
 
     void testSetTemperature()
     {
         ConfigManager cm;
         cm.setTemperature(0.5);
-        QVERIFY(cm.temperature() == 0.5);
+        QVERIFY(cm.getTemperature() == 0.5);
     }
 
     void testMaxTokens()
     {
         ConfigManager cm;
-        QVERIFY(cm.maxTokens() > 0);
+        QVERIFY(cm.getMaxTokens() > 0);
     }
 
     void testSetMaxTokens()
     {
         ConfigManager cm;
         cm.setMaxTokens(2000);
-        QVERIFY(cm.maxTokens() == 2000);
+        QVERIFY(cm.getMaxTokens() == 2000);
     }
 
-    void testToolsEnabled()
+    void testBufferContextEnabled()
     {
         ConfigManager cm;
-        QVERIFY(cm.toolsEnabled() == true);
+        QVERIFY(cm.bufferContextEnabled() == true);
     }
 
-    void testSetToolsEnabled()
+    void testSetBufferContextEnabled()
     {
         ConfigManager cm;
-        cm.setToolsEnabled(false);
-        QVERIFY(cm.toolsEnabled() == false);
+        cm.setBufferContextEnabled(false);
+        QVERIFY(cm.bufferContextEnabled() == false);
     }
 
-    void testAutoScrollEnabled()
+    void testPanelVisible()
     {
         ConfigManager cm;
-        QVERIFY(cm.autoScrollEnabled() == true);
+        QVERIFY(cm.panelVisible() == false);
     }
 
-    void testSetAutoScrollEnabled()
+    void testSetPanelVisible()
     {
         ConfigManager cm;
-        cm.setAutoScrollEnabled(false);
-        QVERIFY(cm.autoScrollEnabled() == false);
-    }
-
-    void testThreadSyncEnabled()
-    {
-        ConfigManager cm;
-        QVERIFY(cm.threadSyncEnabled() == true);
-    }
-
-    void testSetThreadSyncEnabled()
-    {
-        ConfigManager cm;
-        cm.setThreadSyncEnabled(false);
-        QVERIFY(cm.threadSyncEnabled() == false);
+        cm.setPanelVisible(true);
+        QVERIFY(cm.panelVisible() == true);
     }
 
     void testMultipleSetOperations()
     {
         ConfigManager cm;
-        cm.setApiKey("key1");
-        cm.setBaseUrl("url1");
-        cm.setModel("model1");
+        cm.setActiveProvider("provider1");
+        cm.setActiveModel("model1");
         cm.setTemperature(0.9);
         
-        QVERIFY(cm.apiKey() == "key1");
-        QVERIFY(cm.baseUrl() == "url1");
-        QVERIFY(cm.model() == "model1");
-        QVERIFY(cm.temperature() == 0.9);
+        QVERIFY(cm.getActiveProvider() == "provider1");
+        QVERIFY(cm.getActiveModel() == "model1");
+        QVERIFY(cm.getTemperature() == 0.9);
     }
 };
 

@@ -2,6 +2,7 @@
 #include "editorcontext.h"
 #include "threadjson.h"
 #include <KTextEditor/MainWindow>
+#include <KTextEditor/View>
 #include <KTextEditor/Document>
 #include <QUuid>
 #include <QDateTime>
@@ -50,16 +51,16 @@ AgentLoop::AgentLoop(LLMProvider *provider, ToolRegistry *registry, QObject *par
     , m_provider(provider)
     , m_registry(registry)
     , m_threadStorage(new ThreadStorage(this))
-AgentLoop::~AgentLoop()
 {
-    // No cleanup needed
 }
 
 AgentLoop::~AgentLoop()
 {
-    // GhostTextProvider is now disabled to prevent crashes
-    // No cleanup needed
-    delete m_ghostTextProvider;
+}
+
+void AgentLoop::setMainWindow(KTextEditor::MainWindow *mw)
+{
+    m_mainWindow = mw;
 }
 
 void AgentLoop::setProvider(LLMProvider *provider)
@@ -72,7 +73,7 @@ void AgentLoop::setToolRegistry(ToolRegistry *registry)
     m_registry = registry;
 }
 
-
+void AgentLoop::setSystemPrompt(const QString &prompt)
 {
     m_systemPrompt = prompt;
 }
@@ -522,11 +523,6 @@ void AgentLoop::generateTitleFromMessages(const QString &threadId)
         },
         [](const QString &) {}  // onError - silently ignore, tab keeps default title
     );
-}
-
-
-    // DISABLED: GhostTextProvider causes crashes
-    return false;
 }
 
 void AgentLoop::updateProjectIdFromCurrentFile()

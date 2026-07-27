@@ -5,6 +5,9 @@
 #include <QNetworkAccessManager>
 #include <QTimer>
 #include <QSemaphore>
+#include <QFuture>
+#include <QRunnable>
+#include <QMutex>
 
 class OpenAIProvider : public LLMProvider
 {
@@ -19,7 +22,12 @@ public:
     
     bool isAvailable() override;
     QStringList availableModels() override;
-
+    QFuture<LLMResponse> chat(
+        const std::vector<LLMMessage> &messages,
+        const std::vector<ToolDefinition> &tools,
+        const QString &model,
+        double temperature = 0.7
+    ) override;
 
     void chatStream(
         const std::vector<LLMMessage> &messages,

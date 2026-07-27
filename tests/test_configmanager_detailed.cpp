@@ -7,93 +7,77 @@ class TestConfigManagerDetailed : public QObject
 
 private slots:
 
-    void testSetAndGetApiKey()
+    void testSetAndGetActiveProvider()
     {
         ConfigManager cm;
-        cm.setApiKey("sk-test-123");
-        QVERIFY(cm.apiKey() == "sk-test-123");
+        cm.setActiveProvider("test-provider");
+        QVERIFY(cm.getActiveProvider() == "test-provider");
     }
 
-    void testSetAndGetBaseUrl()
+    void testSetAndGetActiveModel()
     {
         ConfigManager cm;
-        cm.setBaseUrl("http://custom:8080/v1");
-        QVERIFY(cm.baseUrl() == "http://custom:8080/v1");
-    }
-
-    void testSetAndGetModel()
-    {
-        ConfigManager cm;
-        cm.setModel("custom-model");
-        QVERIFY(cm.model() == "custom-model");
+        cm.setActiveModel("custom-model");
+        QVERIFY(cm.getActiveModel() == "custom-model");
     }
 
     void testSetAndGetSystemPrompt()
     {
         ConfigManager cm;
         cm.setSystemPrompt("Custom system prompt");
-        QVERIFY(cm.systemPrompt() == "Custom system prompt");
+        QVERIFY(cm.getSystemPrompt() == "Custom system prompt");
     }
 
     void testSetAndGetTemperature()
     {
         ConfigManager cm;
         cm.setTemperature(0.9);
-        QVERIFY(cm.temperature() == 0.9);
+        QVERIFY(cm.getTemperature() == 0.9);
     }
 
     void testSetAndGetMaxTokens()
     {
         ConfigManager cm;
         cm.setMaxTokens(4000);
-        QVERIFY(cm.maxTokens() == 4000);
+        QVERIFY(cm.getMaxTokens() == 4000);
     }
 
-    void testSetAndGetToolsEnabled()
+    void testSetAndGetBufferContextEnabled()
     {
         ConfigManager cm;
-        cm.setToolsEnabled(false);
-        QVERIFY(cm.toolsEnabled() == false);
+        cm.setBufferContextEnabled(false);
+        QVERIFY(cm.bufferContextEnabled() == false);
     }
 
-    void testSetAndGetAutoScrollEnabled()
+    void testSetAndGetPanelVisible()
     {
         ConfigManager cm;
-        cm.setAutoScrollEnabled(false);
-        QVERIFY(cm.autoScrollEnabled() == false);
+        cm.setPanelVisible(false);
+        QVERIFY(cm.panelVisible() == false);
     }
 
-    void testSetAndGetThreadSyncEnabled()
+    void testDefaultValues()
     {
         ConfigManager cm;
-        cm.setThreadSyncEnabled(false);
-        QVERIFY(cm.threadSyncEnabled() == false);
-    }
-
-    void testDefaultValuesNotEmpty()
-    {
-        ConfigManager cm;
-        QVERIFY(!cm.baseUrl().isEmpty());
-        QVERIFY(!cm.model().isEmpty());
-        QVERIFY(!cm.systemPrompt().isEmpty());
+        QVERIFY(cm.getActiveProvider().isEmpty());
+        QVERIFY(cm.getActiveModel().isEmpty());
+        QVERIFY(cm.getSystemPrompt().isEmpty());
     }
 
     void testMultipleConfigChanges()
     {
         ConfigManager cm;
-        cm.setApiKey("key1");
-        cm.setBaseUrl("url1");
-        cm.setModel("model1");
+        cm.setActiveProvider("provider1");
+        cm.setActiveModel("model1");
         cm.setTemperature(0.5);
         cm.setMaxTokens(1000);
-        cm.setToolsEnabled(false);
+        cm.setBufferContextEnabled(false);
         
-        QVERIFY(cm.apiKey() == "key1");
-        QVERIFY(cm.baseUrl() == "url1");
-        QVERIFY(cm.model() == "model1");
-        QVERIFY(cm.temperature() == 0.5);
-        QVERIFY(cm.maxTokens() == 1000);
-        QVERIFY(cm.toolsEnabled() == false);
+        QVERIFY(cm.getActiveProvider() == "provider1");
+        QVERIFY(cm.getActiveModel() == "model1");
+        QVERIFY(cm.getTemperature() == 0.5);
+        QVERIFY(cm.getMaxTokens() == 1000);
+        QVERIFY(cm.bufferContextEnabled() == false);
     }
 };
 

@@ -101,19 +101,7 @@ void AgentPanel::setupUi()
         m_inputBar->setAgentLoop(m_agent);
     }
     
-    if (m_provider) {
-        QStringList models = m_provider->availableModels();
-        if (!models.isEmpty()) {
-            m_inputBar->setModels(models);
-            
-            KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
-            QString defaultModel = group.readEntry("Model", QString());
-            
-            if (!defaultModel.isEmpty() && models.contains(defaultModel)) {
-                m_inputBar->setCurrentModel(defaultModel);
-            }
-        }
-    }
+    reloadModels();
 }
 
 void AgentPanel::connectSignals()
@@ -197,13 +185,8 @@ void AgentPanel::closeChatTab(int index)
     // Get the thread ID before removing the tab
     QString threadId = m_tabs->tabToolTip(index);
     
-    if (!threadId.isEmpty()) {
-        if (m_threadStorage) {
-            m_threadStorage->deleteThread(threadId);
-        }
-        if (m_agent) {
-            m_agent->deleteThread(threadId);
-        }
+    if (!threadId.isEmpty() && m_agent) {
+        m_agent->deleteThread(threadId);
     }
     
     QWidget *widget = m_tabs->widget(index);

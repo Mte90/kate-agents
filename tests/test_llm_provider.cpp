@@ -5,16 +5,22 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QSet>
+#include <QtConcurrent>
+#include <QFutureWatcher>
 
-#include "llmprovider.h"
+#include "../src/llmprovider.h"
 
 struct MockProvider : public LLMProvider
 {
+    using LLMProvider::LLMProvider;
     bool isAvailable() override { return true; }
-    QString name() override { return "Mock"; }
+    QString name() const override { return "Mock"; }
     QStringList availableModels() override { return {"model1", "model2"}; }
     QFuture<LLMResponse> chat(const std::vector<LLMMessage> &, const std::vector<ToolDefinition> &, const QString &, double) override {
-        return QFuture<LLMResponse>::readyResult(LLMResponse{});
+        LLMResponse response;
+        return QtConcurrent::run([response]() {
+            return response;
+        });
     }
     void chatStream(const std::vector<LLMMessage> &, const std::vector<ToolDefinition> &, const QString &,
                    std::function<void(const QString &chunk)>,

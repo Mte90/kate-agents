@@ -8,6 +8,7 @@
 #include <QMutex>
 #include <QFuture>
 #include <QStringList>
+#include <functional>
 
 struct CodeSnippet {
     QString filePath;
@@ -48,6 +49,7 @@ private:
     void indexFile(const QString &filePath);
     void parseFileForSymbols(const QString &filePath, const QString &content);
     QStringList supportedExtensions() const;
+    QVector<CodeSnippet> searchByPredicate(const QString &query, std::function<bool(const CodeSnippet&)> predicate) const;
     
     QString m_projectPath;
     mutable QMutex m_mutex;

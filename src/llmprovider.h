@@ -43,6 +43,7 @@ struct LLMResponse {
     QString content;
     QString thinking;
     QString finishReason;
+    QString error;
     std::vector<ToolCall> toolCalls;
     int promptTokens = 0;
     int completionTokens = 0;

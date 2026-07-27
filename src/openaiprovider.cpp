@@ -8,10 +8,10 @@
 #include <QBuffer>
 #include <QDebug>
 #include <QEventLoop>
-#include <QPromise>
 #include <QByteArray>
 #include <QRegularExpression>
 #include <KLocalizedString>
+#include <QtConcurrent>
 
 OpenAIProvider::OpenAIProvider(const QString &baseUrl, const QString &apiKey, QObject *parent)
     : LLMProvider(parent)
@@ -80,6 +80,29 @@ QStringList OpenAIProvider::availableModels()
     }
     
     return QStringList();  // Empty - user must configure
+}
+
+QFuture<LLMResponse> OpenAIProvider::chat(
+    const std::vector<LLMMessage> &messages,
+    const std::vector<ToolDefinition> &tools,
+    const QString &model,
+    double temperature
+)
+{
+    Q_UNUSED(temperature);
+    return QtConcurrent::run([this, messages = messages, tools = tools, model]() {
+        LLMResponse result;
+        chatStream(messages, tools, model,
+            [](const QString &) {},
+            [&result](const LLMResponse &final) {
+                result = final;
+            },
+            [&result](const QString &error) {
+                result.error = error;
+            }
+        );
+        return result;
+    });
 }
 
 QJsonArray OpenAIProvider::buildToolsJson(const std::vector<ToolDefinition> &tools)

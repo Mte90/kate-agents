@@ -26,7 +26,7 @@ void testConfigSaveLoadRoundtrip()
     QString configPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QFile file(configPath + "/test_roundtrip.json");
     
-    file.open(QIODevice::WriteOnly);
+    QVERIFY(file.open(QIODevice::WriteOnly));
     {
         QJsonObject obj;
         obj["activeProvider"] = "custom";
@@ -38,7 +38,7 @@ void testConfigSaveLoadRoundtrip()
     }
     file.close();
     
-    file.open(QIODevice::ReadOnly);
+    QVERIFY(file.open(QIODevice::ReadOnly));
     {
         QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
         QJsonObject obj = doc.object();

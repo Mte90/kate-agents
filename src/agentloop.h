@@ -91,12 +91,7 @@ private:
     QString m_currentThreadId;
     QMap<QString, ConversationThread> m_threads;
     std::vector<LLMMessage> m_currentRequest;
-    int m_currentIteration = 0;
-    bool m_isRunning = false;
-    QString m_currentThreadId;
-    QMap<QString, ConversationThread> m_threads;
-    std::vector<LLMMessage> m_currentRequest;
     std::vector<ToolDefinition> m_currentTools;
-    };
-    
-    #endif
+};
+
+#endif

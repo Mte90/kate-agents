@@ -58,8 +58,6 @@ set(PROJECT_SOURCES
     src/editorcontext.cpp
     src/toolregistry.h
     src/toolregistry.cpp
-    src/ghosttextprovider.h
-    src/ghosttextprovider.cpp
     src/threadstorage.h
     src/threadstorage.cpp
     src/contextMenuHandler.h

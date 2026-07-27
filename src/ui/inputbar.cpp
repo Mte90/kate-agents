@@ -297,12 +297,7 @@ bool InputBar::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj == m_inputEdit && event->type() == QEvent::KeyPress) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
-        if (keyEvent->key() == Qt::Key_Tab) {
-            if (m_agentLoop && m_agentLoop->hasGhostText()) {
-                m_agentLoop->acceptGhostText();
-                return true;
-            }
-        } else if (keyEvent->key() == Qt::Key_Return && keyEvent->modifiers() & Qt::ControlModifier) {
+        if (keyEvent->key() == Qt::Key_Return && keyEvent->modifiers() & Qt::ControlModifier) {
             onSendClicked();
             return true;
         }

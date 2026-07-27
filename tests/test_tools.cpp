@@ -46,7 +46,7 @@ private slots:
     {
         QString testFile = "/tmp/test_read_file.txt";
         QFile file(testFile);
-        file.open(QIODevice::WriteOnly);
+        QVERIFY(file.open(QIODevice::WriteOnly));
         file.write("line1\nline2\nline3");
         file.close();
         
@@ -124,7 +124,7 @@ private slots:
     {
         QString testFile = "/tmp/test_grep.txt";
         QFile file(testFile);
-        file.open(QIODevice::WriteOnly);
+        QVERIFY(file.open(QIODevice::WriteOnly));
         file.write("hello world\nhello again\ngoodbye");
         file.close();
         

@@ -1,7 +1,6 @@
 #include <QtTest/QtTest>
 #include "../src/configmanager.h"
 #include "../src/permissionmanager.h"
-#include "../src/toolregistry.h"
 
 class TestConfigIntegration : public QObject
 {
@@ -14,10 +13,10 @@ private slots:
         ConfigManager cm;
         PermissionManager pm;
         
-        cm.setToolsEnabled(true);
+        cm.setBufferContextEnabled(true);
         pm.setDefaultPolicy(PermissionPolicy::Allow);
         
-        QVERIFY(cm.toolsEnabled() == true);
+        QVERIFY(cm.bufferContextEnabled() == true);
         QVERIFY(pm.getDefaultPolicy() == PermissionPolicy::Allow);
     }
 
@@ -27,8 +26,8 @@ private slots:
         cm.setTemperature(0.8);
         cm.setMaxTokens(3000);
         
-        QVERIFY(cm.temperature() == 0.8);
-        QVERIFY(cm.maxTokens() == 3000);
+        QVERIFY(cm.getTemperature() == 0.8);
+        QVERIFY(cm.getMaxTokens() == 3000);
     }
 
     void testConfigSystemPromptMultiple()
@@ -38,21 +37,9 @@ private slots:
         cm.setSystemPrompt("Prompt 2");
         cm.setSystemPrompt("Prompt 3");
         
-        QVERIFY(cm.systemPrompt() == "Prompt 3");
+        QVERIFY(cm.getSystemPrompt() == "Prompt 3");
     }
 
-    void testToolRegistryWithConfig()
-    {
-        ConfigManager cm;
-        ToolRegistry registry;
-        
-        cm.setToolsEnabled(true);
-        
-        if (cm.toolsEnabled()) {
-            registry.registerTool(new ReadFileTool());
-            QVERIFY(registry.hasTool("read_file"));
-        }
-    }
 
     void testMultipleToolsWithPermissions()
     {
@@ -67,46 +54,34 @@ private slots:
         QVERIFY(pm.getToolPolicy("unknown") == PermissionPolicy::Deny);
     }
 
-    void testConfigApiKeyAndUrl()
+    void testConfigActiveProviderAndModel()
     {
         ConfigManager cm;
-        cm.setApiKey("sk-test");
-        cm.setBaseUrl("http://localhost:8080");
+        cm.setActiveProvider("test-provider");
+        cm.setActiveModel("test-model");
         
-        QVERIFY(cm.apiKey() == "sk-test");
-        QVERIFY(cm.baseUrl() == "http://localhost:8080");
+        QVERIFY(cm.getActiveProvider() == "test-provider");
+        QVERIFY(cm.getActiveModel() == "test-model");
     }
 
-    void testConfigAutoScrollAndSync()
+    void testConfigPanelVisibleAndBufferContext()
     {
         ConfigManager cm;
-        cm.setAutoScrollEnabled(true);
-        cm.setThreadSyncEnabled(true);
+        cm.setPanelVisible(true);
+        cm.setBufferContextEnabled(true);
         
-        QVERIFY(cm.autoScrollEnabled() == true);
-        QVERIFY(cm.threadSyncEnabled() == true);
-    }
-
-    void testProfileEnumRoundTrip()
-    {
-        QString writeStr = profileToString(AgentProfile::Write);
-        QString askStr = profileToString(AgentProfile::Ask);
-        QString minimalStr = profileToString(AgentProfile::Minimal);
-        
-        QVERIFY(stringToProfile(writeStr) == AgentProfile::Write);
-        QVERIFY(stringToProfile(askStr) == AgentProfile::Ask);
-        QVERIFY(stringToProfile(minimalStr) == AgentProfile::Minimal);
+        QVERIFY(cm.panelVisible() == true);
+        QVERIFY(cm.bufferContextEnabled() == true);
     }
 
     void testDefaultConfigValues()
     {
         ConfigManager cm;
         
-        QVERIFY(!cm.apiKey().isEmpty() || cm.apiKey().isEmpty());
-        QVERIFY(!cm.baseUrl().isEmpty());
-        QVERIFY(!cm.model().isEmpty());
-        QVERIFY(cm.temperature() > 0);
-        QVERIFY(cm.maxTokens() > 0);
+        QVERIFY(cm.getActiveProvider().isEmpty());
+        QVERIFY(cm.getActiveModel().isEmpty());
+        QVERIFY(cm.getTemperature() > 0);
+        QVERIFY(cm.getMaxTokens() > 0);
     }
 
     void testPermissionDenyOverridesAllow()

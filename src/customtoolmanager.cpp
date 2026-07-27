@@ -70,11 +70,8 @@ void CustomToolManager::loadToolFromFile(const QString &filePath)
         qWarning() << "Missing required fields in custom tool:" << filePath;
         return;
     }
-    
-    // Register tool
-    if (registerTool(name, description, schema, command)) {
-        qDebug() << "Loaded custom tool:" << name;
-    }
+
+    registerTool(name, description, schema, command);
 }
 
 bool CustomToolManager::registerTool(const QString &name, const QString &description,

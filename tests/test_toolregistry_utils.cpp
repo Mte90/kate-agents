@@ -12,7 +12,7 @@ private slots:
     void testEmptyRegistry()
     {
         ToolRegistry registry;
-        QVERIFY(registry.getToolDefinitions().isEmpty());
+        QVERIFY(registry.getToolDefinitions().empty());
     }
 
     void testRegisterMultipleTools()
@@ -55,7 +55,7 @@ private slots:
     {
         ToolRegistry registry;
         auto defs = registry.getToolDefinitions();
-        QVERIFY(defs.isEmpty());
+        QVERIFY(defs.empty());
     }
 
     void testRegisterSameToolTwice()
