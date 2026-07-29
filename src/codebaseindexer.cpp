@@ -191,6 +191,7 @@ QVector<CodeSnippet> CodebaseIndexer::searchContent(const QString &query) const
 
 QVector<CodeSnippet> CodebaseIndexer::searchByPredicate(const QString &query, std::function<bool(const CodeSnippet&)> predicate) const
 {
+    Q_UNUSED(query);
     QMutexLocker locker(&m_mutex);
     QVector<CodeSnippet> results;
     

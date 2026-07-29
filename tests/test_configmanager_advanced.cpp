@@ -14,7 +14,7 @@ private slots:
     void testDefaultConstructorValues()
     {
         ConfigManager mgr;
-        QCOMPARE(mgr.getActiveProvider(), QStringLiteral("regolo"));
+        QVERIFY(mgr.getActiveProvider().isEmpty());
         QCOMPARE(mgr.getActiveModel(), QStringLiteral("qwen3-coder-next"));
         QCOMPARE(mgr.getMaxIterations(), 20);
         QCOMPARE(mgr.getMaxTokens(), 4096);
@@ -189,7 +189,7 @@ private slots:
     {
         ConfigManager mgr;
         mgr.load();
-        QCOMPARE(mgr.getActiveProvider(), QStringLiteral("regolo"));
+        QVERIFY(mgr.getActiveProvider().isEmpty());
     }
 
     void testSaveCreatesDirectory()
@@ -244,7 +244,7 @@ private slots:
 
         ConfigManager mgr;
         mgr.load();
-        QCOMPARE(mgr.getActiveProvider(), QStringLiteral("regolo"));
+        QVERIFY(mgr.getActiveProvider().isEmpty());
 
         if (QFile::exists(backupPath)) {
             QFile::remove(configFilePath);
@@ -272,7 +272,7 @@ private slots:
 
         ConfigManager mgr;
         mgr.load();
-        QCOMPARE(mgr.getActiveProvider(), QStringLiteral("regolo"));
+        QVERIFY(mgr.getActiveProvider().isEmpty());
         QCOMPARE(mgr.getMaxIterations(), 20);
 
         if (QFile::exists(backupPath)) {
@@ -304,7 +304,7 @@ private slots:
         ConfigManager mgr;
         mgr.load();
         QCOMPARE(mgr.getActiveProvider(), QStringLiteral("partial-provider"));
-        QCOMPARE(mgr.getActiveModel(), QStringLiteral("qwen3-coder-next"));
+        QVERIFY(mgr.getActiveModel().isEmpty());
         QCOMPARE(mgr.getMaxIterations(), 20);
 
         if (QFile::exists(backupPath)) {

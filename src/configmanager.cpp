@@ -60,6 +60,28 @@ void ConfigManager::load()
         cfg.enabled = providerGroup.readEntry("Enabled", false);
         m_providers.push_back(cfg);
     }
+
+    // Migrate legacy single-provider config ([KateAgent] BaseUrl/ApiKey/Model)
+    // into the multi-provider schema when no providers are registered.
+    if (m_providers.empty()) {
+        const QString legacyBaseUrl = group.readEntry("BaseUrl", QString());
+        const QString legacyApiKey = group.readEntry("ApiKey", QString());
+        const QString legacyModel = group.readEntry("Model", QString());
+        if (!legacyBaseUrl.isEmpty() && !legacyApiKey.isEmpty()) {
+            ProviderConfig cfg;
+            cfg.type = QStringLiteral("openai");
+            cfg.name = QStringLiteral("default");
+            cfg.baseUrl = legacyBaseUrl;
+            cfg.apiKey = legacyApiKey;
+            cfg.defaultModel = legacyModel;
+            cfg.enabled = true;
+            m_providers.push_back(cfg);
+            m_activeProvider = cfg.name;
+            if (m_activeModel.isEmpty()) {
+                m_activeModel = legacyModel;
+            }
+        }
+    }
 }
 
 void ConfigManager::save()

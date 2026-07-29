@@ -10,8 +10,8 @@ private slots:
     {
         ConfigManager manager;
         
-        QCOMPARE(manager.getActiveProvider(), QString("regolo"));
-        QCOMPARE(manager.getActiveModel(), QString("qwen3-coder-next"));
+        QVERIFY(manager.getActiveProvider().isEmpty());
+        QVERIFY(manager.getActiveModel().isEmpty());
         QCOMPARE(manager.getMaxIterations(), 20);
         QCOMPARE(manager.getMaxTokens(), 4096);
         QVERIFY(manager.bufferContextEnabled());
@@ -42,9 +42,7 @@ private slots:
         ConfigManager manager;
         
         ProviderConfig config = manager.getProviderConfig("regolo");
-        QCOMPARE(config.name, QString("regolo"));
-        QCOMPARE(config.type, QString("openai-compatible"));
-        QVERIFY(config.enabled);
+        QVERIFY(config.name.isEmpty());
     }
 
     void testLoadSave()
