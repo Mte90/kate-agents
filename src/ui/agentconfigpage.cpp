@@ -104,6 +104,11 @@ void AgentConfigPage::fetchModelList()
     
     QUrl url(baseUrl + "/models");
     QNetworkRequest request(url);
+    QString apiKey = m_apiKeyEdit->text().trimmed();
+    if (!apiKey.isEmpty()) {
+        QByteArray authHeader = "Bearer " + apiKey.toUtf8();
+        request.setRawHeader("Authorization", authHeader);
+    }
     
     auto *reply = m_networkManager->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
