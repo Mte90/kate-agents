@@ -16,6 +16,7 @@ ThreadView::ThreadView(QWidget *parent)
     : QTextBrowser(parent)
 {
     setReadOnly(true);
+    setOpenLinks(false);
     setOpenExternalLinks(false);
     setAcceptRichText(true);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -100,10 +101,10 @@ QString ThreadView::escapeHtmlStatic(const QString &text)
 QString ThreadView::parseMarkdown(const QString &text)
 {
     // Delegate to static helper
-    return parseMarkdownStatic(text);
+    return parseMarkdownStatic(text, &m_codeBlocks);
 }
 
-QString ThreadView::parseMarkdownStatic(const QString &text)
+QString ThreadView::parseMarkdownStatic(const QString &text, QMap<QString, QString> *codeBlocksOut)
 {
     // Step 1: Process code blocks BEFORE HTML escaping (SyntaxHighlighter handles its own escaping)
     // Use placeholder markers to avoid double-escaping the code block HTML
@@ -131,10 +132,14 @@ QString ThreadView::parseMarkdownStatic(const QString &text)
         QString code = match.captured(2);
         
         QString id = QString("code_%1").arg(++codeBlockCounter);
-        
+        if (codeBlocksOut) {
+            codeBlocksOut->insert(id, code);
+        }
+
         QString highlighted = SyntaxHighlighter::highlight(code, language);
         
-        QString html = QString("<pre><a href='copy:%1' class='copy-btn'>Copy</a><code>%2</code></pre>")
+//        QString html = QString("<pre><a href='copy:%1' class='copy-btn'>Copy</a><code>%2</code></pre>")
+        QString html = QString("<a href='copy:%1'>Copy</a><pre><code>%2</code></pre>")
                        .arg(id, highlighted);
         
         QString placeholder = QString("\x01CODEBLOCK_%1\x01").arg(codeBlockCounter);
@@ -301,7 +306,7 @@ void ThreadView::showStreamingChunk(const QString &chunk)
         if (!m_streamingModel.isEmpty()) {
             insertHtml(QString("<span style='font-weight: bold; font-size: 0.85em;'>%1</span><br>").arg(escapeHtml(m_streamingModel)));
         }
-        insertHtml("<div style='white-space: pre-wrap; word-break: break-word;'>");
+//        insertHtml("<div style='white-space: pre-wrap; word-break: break-word;'>");
         m_streamingStartPosition = textCursor().position();
         // Start cursor blinking on first chunk to avoid indefinite waiting
         m_cursorBlinkCount = 0;
@@ -336,7 +341,8 @@ void ThreadView::endStreaming()
         
         QString markdownHtml = this->parseMarkdown(streamingContent);
         insertHtml(markdownHtml);
-        insertHtml("</div><br>");
+//        insertHtml("</div><br>");
+        insertHtml("<br>");
     } else if (!streamingContent.isEmpty()) {
         insertHtml(this->parseMarkdown(streamingContent));
         insertHtml("<br>");
@@ -359,7 +365,9 @@ void ThreadView::scrollToBottom()
 
 void ThreadView::clear()
 {
+
     QTextBrowser::clear();
+    m_codeBlocks.clear();
     m_streamingContent.clear();
     m_cursorTimer->stop();
     m_cursorVisible = true;
@@ -417,7 +425,7 @@ void ThreadView::renderThread(const QList<LLMMessage> &messages)
 void ThreadView::setSource(const QUrl &name)
 {
     QString urlStr = name.toString();
-    if (urlStr == "show-all" || urlStr.startsWith("copy:")) {
+    if (urlStr == "show-all" || urlStr.startsWith("copy:") || urlStr.startsWith("delete:")) {
         onAnchorClicked(name);
         return;
     }
@@ -426,6 +434,11 @@ void ThreadView::setSource(const QUrl &name)
 
 void ThreadView::onAnchorClicked(const QUrl &url)
 {
+    if (m_handlingAnchor) {
+        return;
+    }
+    m_handlingAnchor = true;
+
     QString urlStr = url.toString();
     if (urlStr == "show-all") {
         QList<LLMMessage> messages;
@@ -444,6 +457,8 @@ void ThreadView::onAnchorClicked(const QUrl &url)
         QString id = urlStr.mid(7);
         emit deleteMessageRequested(id.toInt());
     }
+
+    m_handlingAnchor = false;
 }
 
 void ThreadView::showEvent(QShowEvent *event)

@@ -12,6 +12,9 @@
 #include <QRegularExpression>
 #include <KLocalizedString>
 #include <QtConcurrent>
+#include <KConfigGroup>
+#include <KSharedConfig>
+
 
 OpenAIProvider::OpenAIProvider(const QString &baseUrl, const QString &apiKey, QObject *parent)
     : LLMProvider(parent)
@@ -31,12 +34,26 @@ bool OpenAIProvider::isAvailable()
 
 QStringList OpenAIProvider::availableModels()
 {
+
+    KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
+    
+    QStringList models = group.readEntry("Models", QStringList());
+
+    return models;
+
+/*
+// Old approach that did not work
     // Fetch models from the API (synchronous for now)
     // In a real implementation, this should be async
     if (m_baseUrl.isEmpty() || m_apiKey.isEmpty()) {
         return QStringList();  // Empty - user must configure
     }
-    
+
+    if (!m_baseUrl.endsWith("/v1")) {
+        m_baseUrl += "/v1";
+    }
+
+
     QUrl modelsUrl(m_baseUrl + "/models");
     QNetworkRequest request(modelsUrl);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
@@ -52,8 +69,8 @@ QStringList OpenAIProvider::availableModels()
         loop.quit();
     });
     
-    // Wait for response (timeout after 5 seconds)
-    QTimer::singleShot(5000, &loop, [&loop, &reply]() {
+    // Wait for response (timeout after 10 seconds)
+    QTimer::singleShot(10000, &loop, [&loop, &reply]() {
         if (reply->isOpen()) {
             reply->abort();
             loop.quit();
@@ -80,6 +97,7 @@ QStringList OpenAIProvider::availableModels()
     }
     
     return QStringList();  // Empty - user must configure
+*/
 }
 
 QFuture<LLMResponse> OpenAIProvider::chat(
@@ -149,7 +167,20 @@ void OpenAIProvider::chatStream(
         json["tools"] = buildToolsJson(tools);
     }
 
-    QUrl url(m_baseUrl + "/chat/completions");
+    QString base = m_baseUrl.trimmed();
+    while (base.endsWith('/')) {
+        base.chop(1);
+    }
+
+    constexpr auto kCompletionsSuffix = QLatin1String("/chat/completions");
+
+    if (base.endsWith(kCompletionsSuffix)) {
+        base.chop(kCompletionsSuffix.size());
+        while (base.endsWith('/')) {
+            base.chop(1);
+        }
+    }
+    QUrl url(base + kCompletionsSuffix);
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
@@ -161,21 +192,27 @@ void OpenAIProvider::chatStream(
     QNetworkReply *reply = m_nam->post(request, payload);
     m_currentReply = reply;
 
-    QString responseText;
-    QString reasoningText;
+    struct StreamBuffers {
+        QString responseText;
+        QString reasoningText;
+    };
+    auto buffers = std::make_shared<StreamBuffers>();
+    QPointer<OpenAIProvider> safeThis(this);
+
     m_lineBuffer.clear();
 
-    bool readyReadConnected = QObject::connect(reply, &QNetworkReply::readyRead, [this, &responseText, &reasoningText, onChunk, reply]() {
+    bool readyReadConnected = QObject::connect(reply, &QNetworkReply::readyRead, [safeThis, buffers, onChunk, reply]() {
         if (reply->error() != QNetworkReply::NoError) return;
+        if (!safeThis) return;
 
-        m_lineBuffer += reply->readAll();
+        safeThis->m_lineBuffer += reply->readAll();
 
         while (true) {
-            int pos = m_lineBuffer.indexOf('\n');
+            int pos = safeThis->m_lineBuffer.indexOf('\n');
             if (pos == -1) break;
 
-            QByteArray line = m_lineBuffer.left(pos);
-            m_lineBuffer = m_lineBuffer.mid(pos + 1);
+            QByteArray line = safeThis->m_lineBuffer.left(pos);
+            safeThis->m_lineBuffer = safeThis->m_lineBuffer.mid(pos + 1);
 
             if (line.startsWith("data: ")) {
                 QByteArray jsonData = line.mid(6);
@@ -195,11 +232,11 @@ void OpenAIProvider::chatStream(
                         QString reasoningContent = delta["reasoning_content"].toString();
 
                         if (!reasoningContent.isEmpty()) {
-                            reasoningText += reasoningContent;
+                            buffers->reasoningText += reasoningContent;
                         }
                         if (!content.isEmpty()) {
-                            responseText += content;
-                            if (onChunk) onChunk(content);
+                            buffers->responseText += content;
+                            if (safeThis && onChunk) onChunk(content);
                         }
                     }
                 }
@@ -213,30 +250,34 @@ void OpenAIProvider::chatStream(
         m_rateLimitSemaphore.release();
         return;
     }
+    QObject::connect(reply, &QNetworkReply::finished, [safeThis, reply, buffers, onChunk, onDone, onError]() {
+        if (!safeThis) {
+            reply->deleteLater();
+            return;
+        }
 
-    QObject::connect(reply, &QNetworkReply::finished, [this, reply, &responseText, &reasoningText, onChunk, onDone, onError]() {
-        m_rateLimitSemaphore.release();
-        m_currentReply = nullptr;
-        m_lineBuffer.clear();
-        m_retryCount = 0;
+        safeThis->m_rateLimitSemaphore.release();
+        safeThis->m_currentReply = nullptr;
+        safeThis->m_retryCount = 0;
 
-        // Process remaining buffered data
-        if (!m_lineBuffer.isEmpty()) {
-            QList<QByteArray> lines = m_lineBuffer.split('\n');
+        // Process remaining buffered data before clearing
+        if (!safeThis->m_lineBuffer.isEmpty()) {
+            const QList<QByteArray> lines = safeThis->m_lineBuffer.split('\n');
+            safeThis->m_lineBuffer.clear();
             for (const QByteArray &line : lines) {
                 if (line.startsWith("data: ")) {
-                    QByteArray jsonData = line.mid(6);
+                    const QByteArray jsonData = line.mid(6);
                     if (jsonData.trimmed() == "[DONE]") continue;
                     QJsonParseError parseError;
-                    QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
+                    const QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
                     if (parseError.error != QJsonParseError::NoError) continue;
-                    QJsonObject root = doc.object();
+                    const QJsonObject root = doc.object();
                     if (root.contains("choices") && root["choices"].isArray()) {
-                        QJsonArray choices = root["choices"].toArray();
+                        const QJsonArray choices = root["choices"].toArray();
                         if (!choices.isEmpty()) {
-                            QJsonObject delta = choices.at(0).toObject()["delta"].toObject();
-                            QString content = delta["content"].toString();
-                            if (!content.isEmpty()) onChunk(content);
+                            const QJsonObject delta = choices.at(0).toObject()["delta"].toObject();
+                            const QString content = delta["content"].toString();
+                            if (!content.isEmpty() && onChunk) onChunk(content);
                         }
                     }
                 }
@@ -245,15 +286,14 @@ void OpenAIProvider::chatStream(
 
         if (reply->error() == QNetworkReply::NoError) {
             LLMResponse response;
-            response.content = responseText;
-            response.thinking = reasoningText;
-            onDone(response);
+            response.content = buffers->responseText;
+            response.thinking = buffers->reasoningText;
+            if (onDone) onDone(response);
         } else {
-            onError(reply->errorString());
+            if (onError) onError(reply->errorString());
         }
         reply->deleteLater();
-    });
-}
+    });}
 
 void OpenAIProvider::abort()
 {

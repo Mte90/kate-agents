@@ -14,6 +14,7 @@ target_link_libraries(test_configmanager
     Qt6::Widgets
     Qt6::Concurrent
     KF6::TextEditor
+    KF6::ConfigCore
 )
 add_test(NAME test_configmanager COMMAND test_configmanager)
 
@@ -27,6 +28,7 @@ target_link_libraries(test_editorcontext
     Qt6::Widgets
     Qt6::Concurrent
     KF6::TextEditor
+    KF6::ConfigCore
 )
 add_test(NAME test_editorcontext COMMAND test_editorcontext)
 
@@ -40,6 +42,7 @@ target_link_libraries(test_threadjsonstorage
     Qt6::Core
     Qt6::Widgets
     Qt6::Concurrent
+    KF6::ConfigCore
 )
 add_test(NAME test_threadjsonstorage COMMAND test_threadjsonstorage)
 
@@ -51,6 +54,7 @@ target_link_libraries(test_chatuiflow
     Qt6::Core
     Qt6::Widgets
     Qt6::Concurrent
+    KF6::ConfigCore
 )
 add_test(NAME test_chatuiflow COMMAND test_chatuiflow)
 
@@ -66,6 +70,7 @@ target_link_libraries(test_threadview_streaming
     Qt6::Widgets
     Qt6::Concurrent
     KF6::I18n
+    KF6::ConfigCore
 )
 target_include_directories(test_threadview_streaming PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME test_threadview_streaming COMMAND test_threadview_streaming)
@@ -82,6 +87,7 @@ target_link_libraries(test_threadview_ui
     Qt6::Widgets
     Qt6::Concurrent
     KF6::I18n
+    KF6::ConfigCore
 )
 target_include_directories(test_threadview_ui PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME test_threadview_ui COMMAND test_threadview_ui)
@@ -97,6 +103,7 @@ target_link_libraries(test_syntaxhighlighter
     Qt6::Core
     Qt6::Widgets
     Qt6::Concurrent
+    KF6::ConfigCore
 )
 add_test(NAME test_syntaxhighlighter COMMAND test_syntaxhighlighter)
 
@@ -114,6 +121,7 @@ target_link_libraries(test_retry_abort
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_retry_abort COMMAND test_retry_abort)
 
@@ -127,6 +135,7 @@ target_link_libraries(test_editorcontext_advanced
     Qt6::Widgets
     Qt6::Concurrent
     KF6::TextEditor
+    KF6::ConfigCore
 )
 add_test(NAME test_editorcontext_advanced COMMAND test_editorcontext_advanced)
 
@@ -153,6 +162,7 @@ target_link_libraries(test_agentloop
     Qt6::Sql
     KF6::TextEditor
     KF6::I18n
+    KF6::ConfigCore
 )
 target_include_directories(test_agentloop PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME test_agentloop COMMAND test_agentloop)
@@ -167,6 +177,7 @@ target_link_libraries(test_permissionmanager
     Qt6::Core
     Qt6::Widgets
     Qt6::Concurrent
+    KF6::ConfigCore
 )
 add_test(NAME test_permissionmanager COMMAND test_permissionmanager)
 
@@ -183,6 +194,7 @@ target_link_libraries(test_configmanager_advanced
     KF6::TextEditor
     KF6::ConfigWidgets
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_configmanager_advanced COMMAND test_configmanager_advanced)
 
@@ -196,6 +208,7 @@ target_link_libraries(test_threadjson_advanced
     Qt6::Core
     Qt6::Widgets
     Qt6::Concurrent
+    KF6::ConfigCore
 )
 add_test(NAME test_threadjson_advanced COMMAND test_threadjson_advanced)
 
@@ -222,6 +235,7 @@ target_link_libraries(test_integration
     Qt6::Sql
     KF6::TextEditor
     KF6::I18n
+    KF6::ConfigCore
 )
 target_include_directories(test_integration PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME test_integration COMMAND test_integration)
@@ -231,6 +245,7 @@ add_executable(test_streaming_chunk test_streaming_chunk.cpp)
 target_link_libraries(test_streaming_chunk
     Qt6::Test
     Qt6::Core
+    KF6::ConfigCore
 )
 add_test(NAME test_streaming_chunk COMMAND test_streaming_chunk)
 
@@ -244,6 +259,7 @@ target_link_libraries(test_agentloop_flow
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_agentloop_flow COMMAND test_agentloop_flow)
 
@@ -257,6 +273,7 @@ target_link_libraries(test_agentloop_utils
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_agentloop_utils COMMAND test_agentloop_utils)
 
@@ -270,6 +287,7 @@ target_link_libraries(test_basics
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_basics COMMAND test_basics)
 
@@ -283,6 +301,7 @@ target_link_libraries(test_concurrency
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_concurrency COMMAND test_concurrency)
 
@@ -339,6 +358,7 @@ target_link_libraries(test_contextmenu_events
     Qt6::Network
     KF6::I18n
     KF6::TextEditor
+    KF6::ConfigCore
 )
 add_test(NAME test_contextmenu_events COMMAND test_contextmenu_events)
 
@@ -353,6 +373,7 @@ target_link_libraries(test_contextmenuhandler
     Qt6::Network
     KF6::I18n
     KF6::TextEditor
+    KF6::ConfigCore
 )
 add_test(NAME test_contextmenuhandler COMMAND test_contextmenuhandler)
 
@@ -366,6 +387,7 @@ target_link_libraries(test_diffpreviewdialog
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_diffpreviewdialog COMMAND test_diffpreviewdialog)
 
@@ -384,6 +406,7 @@ target_link_libraries(test_grep_tool
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_grep_tool COMMAND test_grep_tool)
 
@@ -397,6 +420,7 @@ target_link_libraries(test_llm_data
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_llm_data COMMAND test_llm_data)
 
@@ -413,6 +437,7 @@ target_link_libraries(test_llm_provider
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 target_include_directories(test_llm_provider PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 add_test(NAME test_llm_provider COMMAND test_llm_provider)
@@ -431,6 +456,7 @@ target_link_libraries(test_message_deletion
     Qt6::Network
     KF6::I18n
     KF6::TextEditor
+    KF6::ConfigCore
 )
 target_include_directories(test_message_deletion PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 add_test(NAME test_message_deletion COMMAND test_message_deletion)
@@ -455,6 +481,7 @@ target_link_libraries(test_more_tools
     Qt6::Network
     KF6::I18n
     KF6::TextEditor
+    KF6::ConfigCore
 )
 add_test(NAME test_more_tools COMMAND test_more_tools)
 
@@ -483,6 +510,7 @@ target_link_libraries(test_readfile_tool
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_readfile_tool COMMAND test_readfile_tool)
 
@@ -496,6 +524,7 @@ target_link_libraries(test_sandbox_security
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_sandbox_security COMMAND test_sandbox_security)
 
@@ -509,6 +538,7 @@ target_link_libraries(test_streaming_ui
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_streaming_ui COMMAND test_streaming_ui)
 
@@ -522,6 +552,7 @@ target_link_libraries(test_terminal_websearch_tools
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_terminal_websearch_tools COMMAND test_terminal_websearch_tools)
 
@@ -535,6 +566,7 @@ target_link_libraries(test_tool_integration
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_tool_integration COMMAND test_tool_integration)
 
@@ -549,6 +581,7 @@ target_link_libraries(test_toolregistry_utils
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_toolregistry_utils COMMAND test_toolregistry_utils)
 
@@ -563,6 +596,7 @@ target_link_libraries(test_tools
     Qt6::Concurrent
     Qt6::Network
     KF6::I18n
+    KF6::ConfigCore
 )
 add_test(NAME test_tools COMMAND test_tools)
 
@@ -578,5 +612,6 @@ target_link_libraries(test_urlfetch_diagnostic_tools
     Qt6::Network
     KF6::I18n
     KF6::TextEditor
+    KF6::ConfigCore
 )
 add_test(NAME test_urlfetch_diagnostic_tools COMMAND test_urlfetch_diagnostic_tools)

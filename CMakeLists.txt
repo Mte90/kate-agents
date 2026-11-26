@@ -9,7 +9,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -g")
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Network Concurrent Sql)
 find_package(ECM ${KF5_DEP_VERSION} QUIET REQUIRED NO_MODULE)
@@ -32,6 +32,7 @@ find_package(KF6 ${KF6_DEP_VERSION}
         ConfigWidgets
         TextEditor
         XmlGui
+        Config
 )
 
 set(KSYNTAXHIGHLIGHTING_KF6_DIR "/usr/lib/x86_64-linux-gnu/cmake/KF6SyntaxHighlighting")
@@ -117,6 +118,7 @@ target_link_libraries(kateagentplugin PRIVATE
     KF6::ConfigWidgets
     KF6::TextEditor
     KF6::XmlGui
+    KF6::ConfigCore
 )
 target_sources(kateagentplugin PRIVATE ${PROJECT_SOURCES})
 

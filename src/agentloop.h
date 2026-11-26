@@ -35,6 +35,7 @@ public:
     void setToolRegistry(ToolRegistry *registry);
     void setMainWindow(KTextEditor::MainWindow *mw);
     ConversationThread createThread(const QString &title = QString());
+    ConversationThread buildThread(const QString &id, const QString &title = QString()) const;
     void addUserMessage(const QString &threadId, const QString &content, const QString &profile = QString());
     void executeTurn(const QString &threadId, const QString &model = QString());
 
@@ -42,7 +43,7 @@ public:
     void setMaxIterations(int max) { m_maxIterations = max; }
     void setAuditLogger(AuditLogger *logger) { if (m_registry) m_registry->setAuditLogger(logger); }
 
-    bool isRunning() const { return m_isRunning; }
+    bool isRunning() const { return m_isRunning.load(); }
     QString currentThreadId() const { return m_currentThreadId; }
     void abort();
     void saveAllThreads();
@@ -87,7 +88,7 @@ private:
     QString m_systemPrompt;
     int m_maxIterations = 20;
     int m_currentIteration = 0;
-    bool m_isRunning = false;
+    std::atomic<bool> m_isRunning{false};
     QString m_currentThreadId;
     QMap<QString, ConversationThread> m_threads;
     std::vector<LLMMessage> m_currentRequest;

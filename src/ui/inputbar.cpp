@@ -140,6 +140,7 @@ void InputBar::setRunningState(bool running)
         m_inputEdit->setEnabled(true);
         m_inputEdit->setFocus();
         m_filePopup->hidePopup();
+        onTextChanged();
     }
 }
 
@@ -153,6 +154,7 @@ void InputBar::showErrorWithRetry(const QString &error)
     m_retryButton->setVisible(true);
     m_inputEdit->setEnabled(true);
     m_inputEdit->setFocus();
+    onTextChanged();
 }
 
 void InputBar::updateLoadingIndicator()

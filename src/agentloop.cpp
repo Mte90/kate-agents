@@ -78,33 +78,40 @@ void AgentLoop::setSystemPrompt(const QString &prompt)
     m_systemPrompt = prompt;
 }
 
-ConversationThread AgentLoop::createThread(const QString &title)
+ConversationThread AgentLoop::buildThread(const QString &id, const QString &title) const
 {
     ConversationThread thread;
-    thread.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    thread.id = id.isEmpty() ? QUuid::createUuid().toString(QUuid::WithoutBraces) : id;
     thread.createdAt = QDateTime::currentDateTime();
-    thread.updatedAt = QDateTime::currentDateTime();
+    thread.updatedAt = thread.createdAt;
     thread.title = title;
     thread.isActive = true;
-    
+
     if (!m_systemPrompt.isEmpty()) {
         LLMMessage systemMsg;
         systemMsg.role = "system";
         systemMsg.content = m_systemPrompt;
         thread.messages.push_back(systemMsg);
     }
-    
+
+    return thread;
+}
+
+ConversationThread AgentLoop::createThread(const QString &title)
+{
+    ConversationThread thread = buildThread(QString(), title);
+
     {
         QMutexLocker locker(&m_threadsMutex);
         m_threads[thread.id] = thread;
     }
-    
+
     if (m_threadStorage) {
         m_threadStorage->saveThread(thread);
     }
-    
+
     emit threadUpdated(thread.id);
-    
+
     return thread;
 }
 
@@ -113,36 +120,38 @@ void AgentLoop::addUserMessage(const QString &threadId, const QString &content, 
     if (threadId.isEmpty() || content.isEmpty()) {
         return;
     }
-    
-    QMutexLocker locker(&m_threadsMutex);
-    
-    if (!m_threads.contains(threadId)) {
-        m_threads[threadId] = createThread();
-        m_threads[threadId].id = threadId;
-        if (m_threadStorage) {
-            m_threadStorage->saveThread(m_threads[threadId]);
+
+    ConversationThread threadCopy;
+    {
+        QMutexLocker locker(&m_threadsMutex);
+
+        if (!m_threads.contains(threadId)) {
+            m_threads[threadId] = buildThread(threadId);
         }
+
+        ConversationThread &thread = m_threads[threadId];
+
+        LLMMessage userMsg;
+        userMsg.role = "user";
+        userMsg.content = content;
+        userMsg.profile = profile;
+        thread.messages.push_back(userMsg);
+        thread.updatedAt = QDateTime::currentDateTime();
+
+        threadCopy = thread;
     }
-
-    ConversationThread &thread = m_threads[threadId];
-
-    LLMMessage userMsg;
-    userMsg.role = "user";
-    userMsg.content = content;
-    userMsg.profile = profile;
-    thread.messages.push_back(userMsg);
-
-    thread.updatedAt = QDateTime::currentDateTime();
 
     if (m_threadStorage) {
-        m_threadStorage->saveThread(thread);
+        m_threadStorage->saveThread(threadCopy);
     }
-    
     emit threadUpdated(threadId);
 }
 
 void AgentLoop::executeTurn(const QString &threadId, const QString &model)
 {
+    if (m_isRunning) {
+        return;
+    }
     if (threadId.isEmpty()) {
         emit error("Invalid thread ID");
         return;
@@ -164,6 +173,7 @@ void AgentLoop::executeTurn(const QString &threadId, const QString &model)
     }
 
     m_isRunning = true;
+    runningChanged(true);
     m_currentThreadId = threadId;
     {
         QMutexLocker locker(&m_iterationMutex);
@@ -246,19 +256,24 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
                 handleToolCalls(final.toolCalls, threadId);
                 
                 // Increment iteration and continue loop iteratively
+                int nextIteration = 0;
                 {
                     QMutexLocker locker(&m_iterationMutex);
                     m_currentIteration++;
+                    nextIteration = m_currentIteration;
                 }
-                if (m_currentIteration < m_maxIterations) {
+                if (nextIteration < m_maxIterations) {
                     // Continue the loop iteratively - call LLM again after tools complete
                     callLLMInternal(threadId, model);
                 } else {
-                    // Max iterations reached
+                    {
+                         QMutexLocker locker(&m_iterationMutex);
+                         m_currentIteration = 0;
+                    }
                     m_isRunning = false;
+                    emit error(QString("Max iterations (%1) reached").arg(m_maxIterations));
                     emit runningChanged(false);
                     emit turnCompleted(threadId);
-                    m_currentIteration = 0; // Reset for next turn
                 }
             } else {
                 // No more tool calls, turn is complete
@@ -419,7 +434,7 @@ void AgentLoop::handleToolCalls(const std::vector<ToolCall> &toolCalls, const QS
     
     // Add results to thread
     {
-        QMutexLocker locker(&m_threadsMutex);
+//        QMutexLocker locker(&m_threadsMutex);
         if (!m_threads.contains(threadId)) {
             emit error(tr("Thread not found: %1").arg(threadId));
             return;

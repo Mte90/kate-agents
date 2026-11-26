@@ -184,10 +184,17 @@ QIcon AgentConfigPage::icon() const
 
 void AgentConfigPage::apply()
 {
+
+    QStringList modelNames;
+    modelNames.reserve(m_modelComboBox->count());
+    for (int i = 0; i < m_modelComboBox->count(); ++i) {
+        modelNames.append(m_modelComboBox->itemText(i));
+    }
     KConfigGroup group(KSharedConfig::openConfig(), "KateAgent");
     group.writeEntry("ApiKey", m_apiKeyEdit->text());
     group.writeEntry("BaseUrl", m_baseUrlEdit->text());
     group.writeEntry("Model", m_modelComboBox->currentText());
+    group.writeEntry("Models", modelNames);
     group.writeEntry("SystemPrompt", m_systemPromptEdit->toPlainText());
     group.sync();
 

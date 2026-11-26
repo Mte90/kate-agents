@@ -566,6 +566,9 @@ void AgentPanel::onTurnCompleted()
             m_agent->generateTitleFromMessages(m_currentThreadId);
         }
     }
+    if (m_inputBar && (!m_agent || !m_agent->isRunning())) {
+        m_inputBar->setRunningState(false);
+    }
 }
 
 void AgentPanel::onTitleGenerated(const QString &threadId, const QString &title)
@@ -595,6 +598,9 @@ void AgentPanel::onError(const QString &error)
             threadView->appendHtml(QString("<div class='tool-result error'>%1</div>").arg(i18n("Error: %1").arg(error)));
             threadView->ensureCursorVisible();  // Scroll to show the error
         }
+    }
+    if (m_inputBar && (!m_agent || !m_agent->isRunning())) {
+        m_inputBar->setRunningState(false);
     }
 }
 

@@ -40,7 +40,7 @@ public:
     const std::vector<LLMMessage>& getAllMessages() const { return m_allMessages; }
     
     // Static helper for testing
-    static QString parseMarkdownStatic(const QString &text);
+    static QString parseMarkdownStatic(const QString &text, QMap<QString, QString> *codeBlocksOut);
     
 protected:
     QString parseMarkdown(const QString &text);
@@ -75,6 +75,7 @@ private:
     QMap<QString, QString> m_codeBlocks;
     QMap<QString, QString> m_codeBlockHtml;
     int m_codeBlockCounter = 0;
+    bool m_handlingAnchor = false;
 };
 
 #endif
