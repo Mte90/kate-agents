@@ -232,9 +232,14 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
                 assistantMsg.role = "assistant";
                 assistantMsg.content = final.content;
                 assistantMsg.thinking = final.thinking;
+                assistantMsg.toolCalls = final.toolCalls; // requires LLMMessage::toolCalls field
                 {
                     QMutexLocker locker(&m_threadsMutex);
                     m_threads[threadId].messages.push_back(assistantMsg);
+                }
+                if (final.content.isEmpty() && !final.thinking.isEmpty()) {
+                    emit thinkingChunk(final.thinking);
+                    emit chunkReceived(threadId, final.thinking, true);
                 }
             }
             // Check for tool calls
@@ -298,6 +303,11 @@ void AgentLoop::callLLMInternal(const QString &threadId, const QString &model)
             m_isRunning = false;
             emit runningChanged(false);
             m_currentIteration = 0; // Reset for next turn
+        },
+        // thinking output
+        [this, threadId](const QString &thinking) {
+            emit thinkingChunk(thinking);
+            emit chunkReceived(threadId, thinking, true);
         }
     );
 }
@@ -356,9 +366,10 @@ void AgentLoop::buildRequest(const QString &threadId)
     }
 
     // If over budget, truncate oldest messages (keeping system prompt)
-    if (totalChars > maxChars) {
+    size_t systemOffset = hasSystemPrompt ? 1 : 0;
+    if (totalChars > maxChars  && totalMessages > systemOffset) {
         int currentChars = totalChars;
-        startIndex = hasSystemPrompt ? 1 : 0;
+        startIndex = systemOffset;
         
         // Remove oldest messages until under budget
         while (startIndex < totalMessages && currentChars > maxChars) {
@@ -367,8 +378,13 @@ void AgentLoop::buildRequest(const QString &threadId)
         }
         
         // Ensure we keep at least some messages (minimum minMessagesToKeep non-system messages)
-        if (startIndex > totalMessages - minMessagesToKeep) {
-            startIndex = std::max(static_cast<size_t>(hasSystemPrompt ? 1 : 0), totalMessages - minMessagesToKeep);
+        if (totalMessages > minMessagesToKeep) {
+            size_t maxAllowedStart = totalMessages - minMessagesToKeep;
+            if (startIndex > maxAllowedStart) {
+                startIndex = std::max(systemOffset, maxAllowedStart);
+            }
+        } else {
+            startIndex = systemOffset;
         }
     }
 

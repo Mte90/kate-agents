@@ -43,7 +43,7 @@ bool PermissionManager::isAllowed(const QString &toolName) const
     return policy == PermissionPolicy::Allow;
 }
 
-bool PermissionManager::requestPermission(const QString &toolName)
+bool PermissionManager::requestPermission(const QString &toolName, const QJsonObject &args)
 {
     if (!requiresConfirmation(toolName)) {
         return isAllowed(toolName);
@@ -56,9 +56,6 @@ bool PermissionManager::requestPermission(const QString &toolName)
             return true;
         }
     }
-    
-    // Emit signal for UI to show dialog
-    emit permissionRequested(toolName);
     
     // Block until user responds
     QEventLoop waitLoop;
@@ -81,22 +78,31 @@ bool PermissionManager::requestPermission(const QString &toolName)
     };
     
     // Use queued connections to ensure slots run in the right thread
-    connect(this, &PermissionManager::permissionGranted, this, onGranted, Qt::QueuedConnection);
-    connect(this, &PermissionManager::permissionDenied, this, onDenied, Qt::QueuedConnection);
+    QMetaObject::Connection connGranted = connect(this, &PermissionManager::permissionGranted, this, onGranted, Qt::QueuedConnection);
+    QMetaObject::Connection connDenied = connect(this, &PermissionManager::permissionDenied, this, onDenied, Qt::QueuedConnection);
     
-    waitLoop.exec();
+    // Emit signal for UI to show dialog
+    emit permissionRequested(toolName, args);
     
-    // Cleanup
-    m_waitLoop = nullptr;
-    m_pendingTool.clear();
-    
-    // Update session permissions based on user choice
-    {
-        QMutexLocker locker(&m_mutex);
-        m_sessionPermissions[toolName] = m_permissionGranted;
+    if (m_waitLoop == &waitLoop) {
+        waitLoop.exec();
     }
     
-    return m_permissionGranted;
+    // Cleanup
+    disconnect(connGranted);
+    disconnect(connDenied);
+    
+    // Update session permissions based on user choice
+    bool granted = false;
+    {
+        QMutexLocker locker(&m_mutex);
+        m_waitLoop = nullptr;
+        m_pendingTool.clear();
+        granted = m_permissionGranted;
+        m_sessionPermissions[toolName] = granted;
+    }
+    
+    return granted;
 }
 
 void PermissionManager::grantPermission(const QString &toolName)

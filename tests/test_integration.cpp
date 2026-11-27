@@ -33,7 +33,8 @@ public:
                     const QString &,
                     std::function<void(const QString &)>,
                     std::function<void(const LLMResponse &)> onDone,
-                    std::function<void(const QString &)>) override
+                    std::function<void(const QString &)>,
+                    std::function<void(const QString &)> = nullptr) override
     {
         if (onDone) {
             LLMResponse resp;

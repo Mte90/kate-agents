@@ -117,6 +117,7 @@ void AgentPanel::connectSignals()
     connect(m_inputBar, &InputBar::systemPromptChanged, this, &AgentPanel::onSystemPromptChanged);
     connect(m_tabs, &QTabWidget::tabCloseRequested, this, &AgentPanel::onTabCloseRequested);
     connect(m_tabs, &QTabWidget::currentChanged, this, &AgentPanel::onCurrentTabChanged);
+    connect(m_agent, &AgentLoop::thinkingChunk, this, &AgentPanel::onThinkingChunk);
     
     if (m_agent) {
         connect(m_agent, &AgentLoop::responseStarted, this, &AgentPanel::onResponseStarted);
@@ -480,6 +481,29 @@ void AgentPanel::onResponseStarted()
             threadView->resetStreaming();
         }
     }
+    m_thinkingPopupShownForTurn = false;
+//    if (m_thinkingPopup) {
+//    }
+}
+
+void AgentPanel::onThinkingChunk(const QString &chunk)
+{
+    if (chunk.isEmpty()) {
+        return;
+    }
+
+    if (!m_thinkingPopupShownForTurn) {
+        m_thinkingPopupShownForTurn = true;
+        if (!m_thinkingPopup) {
+            m_thinkingPopup = new ThinkingPopup(m_agent, this);
+        }
+        m_thinkingPopup->show();
+        m_thinkingPopup->raise();
+    }
+
+    if (m_thinkingPopup) {
+        m_thinkingPopup->appendThinking(chunk);
+    }
 }
 
 void AgentPanel::onChunkReceived(const QString &threadId, const QString &chunk, bool isThinking)
@@ -609,7 +633,7 @@ void AgentPanel::onRunningChanged(bool running)
     m_inputBar->setRunningState(running);
 }
 
-void AgentPanel::onPermissionRequested(const QString &toolName)
+void AgentPanel::onPermissionRequested(const QString &toolName, const QJsonObject &args)
 {
     if (toolName.isEmpty() || !m_permissions) {
         return;
@@ -623,14 +647,27 @@ void AgentPanel::onPermissionRequested(const QString &toolName)
     QPushButton* alwaysBtn = msgBox.addButton(tr("Always Allow"), QMessageBox::ActionRole);
     QPushButton* denyBtn = msgBox.addButton(tr("Deny"), QMessageBox::RejectRole);
     
+    if (!args.isEmpty()) {
+        if (toolName == QLatin1String("terminal")) {
+            const QString cmd = args.value(QStringLiteral("command")).toString();
+            const QString wd = args.value(QStringLiteral("working_directory")).toString(QStringLiteral("."));
+            msgBox.setInformativeText(tr("Working directory: %1\nCommand:\n%2").arg(wd, cmd));
+            alwaysBtn->setEnabled(false);
+            alwaysBtn->setToolTip(tr("Persistent approval is disabled for terminal commands."));
+        } else {
+            msgBox.setDetailedText(QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Indented)));
+        }
+    }
+
     msgBox.exec();
-    
+    Q_UNUSED(denyBtn)
+
     if (msgBox.clickedButton() == allowBtn) {
         m_permissions->grantPermission(toolName);
     } else if (msgBox.clickedButton() == alwaysBtn) {
         m_permissions->grantPermission(toolName);
         m_permissions->setToolPolicy(toolName, PermissionPolicy::Allow);
-    } else if (msgBox.clickedButton() == denyBtn) {
+    } else {
         m_permissions->denyPermission(toolName);
     }
     // If dialog closed without button click (ESC), deny permission

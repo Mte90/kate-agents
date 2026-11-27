@@ -35,7 +35,8 @@ public:
         const QString &model,
         std::function<void(const QString &chunk)> onChunk,
         std::function<void(const LLMResponse &final)> onDone,
-        std::function<void(const QString &error)> onError
+        std::function<void(const QString &error)> onError,
+        std::function<void(const QString &thinking)> onThinking = nullptr
     ) override;
 
     void abort() override;

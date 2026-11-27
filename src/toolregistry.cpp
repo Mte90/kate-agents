@@ -30,7 +30,7 @@ QJsonObject ToolRegistry::executeTool(const QString &name, const QJsonObject &ar
         // Check if permission is allowed
         if (m_permissionManager && !m_permissionManager->isAllowed(name)) {
             // Request permission - this will emit signal for UI to show dialog
-            m_permissionManager->requestPermission(name);
+            m_permissionManager->requestPermission(name, args);
             
             // Re-check if permission was granted after user interaction
             if (!m_permissionManager->isAllowed(name)) {

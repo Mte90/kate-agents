@@ -45,7 +45,7 @@ private:
         }
 
         // Check for dangerous pipe patterns (curl | bash, wget | sh, etc.)
-        if (trimmed.contains(QRegularExpression("|\\s*(bash|sh|zsh|fish|ksh|dash|csh|tcsh)"))) {
+        if (trimmed.contains(QRegularExpression("\\|\\s*(bash|sh|zsh|fish|ksh|dash|csh|tcsh)"))) {
             return true;
         }
 
@@ -121,21 +121,36 @@ public:
         QProcess process;
         process.setWorkingDirectory(workingDir);
         
+        QEventLoop loop;
         QTimer timeoutTimer;
         timeoutTimer.setSingleShot(true);
-        timeoutTimer.start(timeout * 1000);
         
+        bool timedOut = false;
+        QObject::connect(&process, &QProcess::finished, &loop, &QEventLoop::quit);
+        QObject::connect(&timeoutTimer, &QTimer::timeout, &loop, [&]() {
+            timedOut = true;
+            loop.quit();
+        });
+
+        timeoutTimer.start(timeout * 1000);
         process.start("bash", QStringList() << "-c" << command);
         
-        // Wait for process to finish OR timeout
-        while (process.state() == QProcess::Running && timeoutTimer.isActive()) {
-            process.waitForFinished(100);  // Wait 100ms at a time
+        if (!process.waitForStarted()) {
+            return QJsonObject{
+                {"error", i18n("Failed to start shell process")},
+                {"success", false}
+            };
         }
-        
-        bool timedOut = !timeoutTimer.isActive() && process.state() == QProcess::Running;
-        if (timedOut) {
+
+        // Wait for process to finish OR timeout
+        if (process.state() == QProcess::Running) {
+            loop.exec();
+        }
+        timeoutTimer.stop();
+
+        if (timedOut && process.state() == QProcess::Running) {
             process.kill();
-            process.waitForFinished(1000);  // Give it 1 second to clean up
+            process.waitForFinished(1000);
         }
         
         QString stdout = process.readAllStandardOutput();

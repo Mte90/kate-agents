@@ -6,6 +6,7 @@
 #include <QMap>
 #include <QMutex>
 #include <QEventLoop>
+#include <QJsonObject>
 
 enum class PermissionPolicy {
     Allow,
@@ -31,13 +32,13 @@ public:
     bool isAllowed(const QString &toolName) const;
 
 public slots:
-    bool requestPermission(const QString &toolName);
+    bool requestPermission(const QString &toolName, const QJsonObject &args = {});
     void grantPermission(const QString &toolName);
     void denyPermission(const QString &toolName);
     void clearSessionPermissions();
 
 signals:
-    void permissionRequested(const QString &toolName);
+    void permissionRequested(const QString &toolName, const QJsonObject &args);
     void permissionGranted(const QString &toolName);
     void permissionDenied(const QString &toolName);
 

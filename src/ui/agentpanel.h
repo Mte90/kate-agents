@@ -11,7 +11,9 @@
 #include <QHash>
 #include <QHash>
 #include <QMouseEvent>
+#include <QPointer>
 
+#include "thinkingpopup.h"
 #include "threadview.h"
 #include "inputbar.h"
 
@@ -106,7 +108,7 @@ private slots:
     void onThreadUpdated(const QString &threadId);
     void onError(const QString &error);
     void onRunningChanged(bool running);
-    void onPermissionRequested(const QString &toolName);
+    void onPermissionRequested(const QString &toolName, const QJsonObject &args);
     void onNewChat();
     void onTabCloseRequested(int index);
     void onDeleteMessage(int messageId);
@@ -114,6 +116,7 @@ private slots:
     void updateModelFromSettings();
     void renameChatTab(int index);
     void onTitleGenerated(const QString &threadId, const QString &title);
+    void onThinkingChunk(const QString &chunk);
 
 private:
     // Methods
@@ -141,6 +144,8 @@ private:
     bool m_hasUnsavedChanges = false;  // Track if current thread has unsaved changes
     QSet<QString> m_pendingTitleTabs;  // Tabs awaiting LLM title generation
     QHash<QString, int> m_tabHash;  // threadId → tab index for O(1) lookups
+    QPointer<ThinkingPopup> m_thinkingPopup;
+    bool m_thinkingPopupShownForTurn = false;
 };
 
 #endif

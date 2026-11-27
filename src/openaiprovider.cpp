@@ -10,11 +10,29 @@
 #include <QEventLoop>
 #include <QByteArray>
 #include <QRegularExpression>
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QTextStream>
 #include <KLocalizedString>
 #include <QtConcurrent>
 #include <KConfigGroup>
 #include <KSharedConfig>
+#include <map>
 
+static void logRawSseData(const QByteArray &rawPayload)
+{
+    QFile file(QDir::temp().filePath(QStringLiteral("kate_agent_sse.log")));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        return;
+    }
+
+    QTextStream out(&file);
+    out << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
+        << " | "
+        << QString::fromUtf8(rawPayload)
+        << '\n';
+}
 
 OpenAIProvider::OpenAIProvider(const QString &baseUrl, const QString &apiKey, QObject *parent)
     : LLMProvider(parent)
@@ -144,8 +162,9 @@ void OpenAIProvider::chatStream(
     const std::vector<ToolDefinition> &tools,
     const QString &model,
     std::function<void(const QString &chunk)> onChunk,
-                                std::function<void(const LLMResponse &final)> onDone,
-                                std::function<void(const QString &error)> onError)
+    std::function<void(const LLMResponse &final)> onDone,
+    std::function<void(const QString &error)> onError,
+    std::function<void(const QString &thinking)> onThinking)
 {
     QJsonObject json;
     json["model"] = model;
@@ -155,10 +174,35 @@ void OpenAIProvider::chatStream(
     for (const auto &msg : messages) {
         QJsonObject msgObj;
         msgObj["role"] = msg.role;
-        msgObj["content"] = msg.content;
-        if (!msg.toolCallId.isEmpty()) {
+        if (msg.role == "tool") {
             msgObj["tool_call_id"] = msg.toolCallId;
+            msgObj["content"] = msg.content;
+        } else if (msg.role == "assistant" && !msg.toolCalls.empty()) {
+            QJsonArray toolCallsArr;
+            for (const auto &tc : msg.toolCalls) {
+                QJsonObject tcObj;
+                tcObj["id"] = tc.id;
+                tcObj["type"] = "function";
+
+                QString argsJson = tc.arguments.isEmpty()
+                    ? QStringLiteral("{}")
+                    : QString::fromUtf8(QJsonDocument(tc.arguments).toJson(QJsonDocument::Compact));
+
+                QJsonObject fnObj;
+                fnObj["name"] = tc.name;
+                fnObj["arguments"] = argsJson;
+
+                tcObj["function"] = fnObj;
+                toolCallsArr.append(tcObj);
+            }
+            msgObj["tool_calls"] = toolCallsArr;
+            if (!msg.content.isEmpty()) {
+                msgObj["content"] = msg.content;
+            }
+        } else {
+            msgObj["content"] = msg.content;
         }
+
         msgArray.append(msgObj);
     }
     json["messages"] = msgArray;
@@ -192,16 +236,23 @@ void OpenAIProvider::chatStream(
     QNetworkReply *reply = m_nam->post(request, payload);
     m_currentReply = reply;
 
+    struct PendingToolCall {
+        QString id;
+        QString name;
+        QString argumentsRaw;
+    };
+
     struct StreamBuffers {
         QString responseText;
         QString reasoningText;
+        std::map<int, PendingToolCall> toolCallsByIndex;
     };
     auto buffers = std::make_shared<StreamBuffers>();
     QPointer<OpenAIProvider> safeThis(this);
 
     m_lineBuffer.clear();
 
-    bool readyReadConnected = QObject::connect(reply, &QNetworkReply::readyRead, [safeThis, buffers, onChunk, reply]() {
+    bool readyReadConnected = QObject::connect(reply, &QNetworkReply::readyRead, [safeThis, buffers, onChunk, reply, onThinking]() {
         if (reply->error() != QNetworkReply::NoError) return;
         if (!safeThis) return;
 
@@ -216,6 +267,7 @@ void OpenAIProvider::chatStream(
 
             if (line.startsWith("data: ")) {
                 QByteArray jsonData = line.mid(6);
+                logRawSseData(jsonData);
                 if (jsonData.trimmed() == "[DONE]") continue;
 
                 QJsonParseError parseError;
@@ -229,14 +281,37 @@ void OpenAIProvider::chatStream(
                         QJsonObject choice = choices.at(0).toObject();
                         QJsonObject delta = choice["delta"].toObject();
                         QString content = delta["content"].toString();
-                        QString reasoningContent = delta["reasoning_content"].toString();
+                        QString reasoningContent = delta["reasoning"].toString();
+                        if (reasoningContent.isEmpty()) {
+                            reasoningContent = delta["reasoning_content"].toString();
+                        }
 
                         if (!reasoningContent.isEmpty()) {
                             buffers->reasoningText += reasoningContent;
+                            if (safeThis && onThinking) onThinking(reasoningContent);
                         }
                         if (!content.isEmpty()) {
                             buffers->responseText += content;
                             if (safeThis && onChunk) onChunk(content);
+                        }
+                        if (delta.contains("tool_calls") && delta["tool_calls"].isArray()) {
+                            const QJsonArray tcDeltas = delta["tool_calls"].toArray();
+                            for (const QJsonValue &tcVal : tcDeltas) {
+                                const QJsonObject tcDelta = tcVal.toObject();
+                                int idx = tcDelta["index"].toInt(0);
+                                PendingToolCall &pending = buffers->toolCallsByIndex[idx];
+
+                                if (tcDelta.contains("id") && !tcDelta["id"].toString().isEmpty()) {
+                                    pending.id = tcDelta["id"].toString();
+                                }
+                                const QJsonObject fnDelta = tcDelta["function"].toObject();
+                                if (fnDelta.contains("name") && !fnDelta["name"].toString().isEmpty()) {
+                                    pending.name += fnDelta["name"].toString();
+                                }
+                                if (fnDelta.contains("arguments")) {
+                                    pending.argumentsRaw += fnDelta["arguments"].toString();
+                                }
+                            }
                         }
                     }
                 }
@@ -250,7 +325,7 @@ void OpenAIProvider::chatStream(
         m_rateLimitSemaphore.release();
         return;
     }
-    QObject::connect(reply, &QNetworkReply::finished, [safeThis, reply, buffers, onChunk, onDone, onError]() {
+    QObject::connect(reply, &QNetworkReply::finished, [safeThis, reply, buffers, onChunk, onDone, onError, onThinking]() {
         if (!safeThis) {
             reply->deleteLater();
             return;
@@ -276,8 +351,36 @@ void OpenAIProvider::chatStream(
                         const QJsonArray choices = root["choices"].toArray();
                         if (!choices.isEmpty()) {
                             const QJsonObject delta = choices.at(0).toObject()["delta"].toObject();
+                            const QString reasoningContent = delta["reasoning_content"].toString();
                             const QString content = delta["content"].toString();
-                            if (!content.isEmpty() && onChunk) onChunk(content);
+                            if (!reasoningContent.isEmpty()) {
+                                buffers->reasoningText += reasoningContent;
+                                if (safeThis && onThinking) onThinking(reasoningContent);
+                            }
+                            if (!content.isEmpty() && onChunk) {
+                                buffers->responseText += content;
+                                onChunk(content);
+                            }
+                            if (delta.contains("tool_calls") && delta["tool_calls"].isArray()) {
+                                const QJsonArray tcDeltas = delta["tool_calls"].toArray();
+                                for (const QJsonValue &tcVal : tcDeltas) {
+                                    const QJsonObject tcDelta = tcVal.toObject();
+                                    int idx = tcDelta["index"].toInt(0);
+                                    PendingToolCall &pending = buffers->toolCallsByIndex[idx];
+
+                                    if (tcDelta.contains("id") && !tcDelta["id"].toString().isEmpty()) {
+                                        pending.id = tcDelta["id"].toString();
+                                    }
+                                    const QJsonObject fnDelta = tcDelta["function"].toObject();
+                                    if (fnDelta.contains("name") && !fnDelta["name"].toString().isEmpty()) {
+                                        pending.name += fnDelta["name"].toString();
+                                    }
+                                    if (fnDelta.contains("arguments")) {
+                                        pending.argumentsRaw += fnDelta["arguments"].toString();
+                                    }
+                                }
+                            }
+
                         }
                     }
                 }
@@ -288,6 +391,20 @@ void OpenAIProvider::chatStream(
             LLMResponse response;
             response.content = buffers->responseText;
             response.thinking = buffers->reasoningText;
+            for (const auto &[idx, pending] : buffers->toolCallsByIndex) {
+                Q_UNUSED(idx);
+                ToolCall tc;
+                tc.id = pending.id;
+                tc.name = pending.name;
+                if (!pending.argumentsRaw.isEmpty()) {
+                    QJsonParseError argErr;
+                    const QJsonDocument argDoc = QJsonDocument::fromJson(pending.argumentsRaw.toUtf8(), &argErr);
+                    if (argErr.error == QJsonParseError::NoError && argDoc.isObject()) {
+                        tc.arguments = argDoc.object();
+                    }
+                }
+                response.toolCalls.push_back(tc);
+            }
             if (onDone) onDone(response);
         } else {
             if (onError) onError(reply->errorString());

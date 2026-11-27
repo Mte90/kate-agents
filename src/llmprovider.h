@@ -11,24 +11,14 @@
 #include <QDateTime>
 #include <QList>
 
-struct LLMMessage {
-    QString role;
-    QString content;
-    QString profile;
-    QString toolCallId;
-    QString thinking;
-    
-    LLMMessage() = default;
-    ~LLMMessage() noexcept(true) = default;
-};
-
-Q_DECLARE_METATYPE(LLMMessage)
-
 struct ToolCall {
     QString id;
     QString name;
     QJsonObject arguments;
 };
+
+
+Q_DECLARE_METATYPE(ToolCall)
 
 struct ToolDefinition {
     QString type;
@@ -38,6 +28,20 @@ struct ToolDefinition {
         QJsonObject parameters;
     } function;
 };
+
+struct LLMMessage {
+    QString role;
+    QString content;
+    QString profile;
+    QString toolCallId;
+    QString thinking;
+    std::vector<ToolCall> toolCalls;
+    
+    LLMMessage() = default;
+    ~LLMMessage() noexcept(true) = default;
+};
+
+Q_DECLARE_METATYPE(LLMMessage)
 
 struct LLMResponse {
     QString content;
@@ -84,7 +88,8 @@ public:
         const QString &model,
         std::function<void(const QString &chunk)> onChunk,
         std::function<void(const LLMResponse &final)> onDone,
-        std::function<void(const QString &error)> onError
+        std::function<void(const QString &error)> onError,
+        std::function<void(const QString &thinking)> onThinking = nullptr
     ) = 0;
 
     virtual void abort() {}

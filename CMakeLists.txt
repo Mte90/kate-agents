@@ -101,6 +101,8 @@ set(PROJECT_SOURCES
     src/ui/syntaxhighlighter.cpp
     src/ui/diffpreviewdialog.h
     src/ui/diffpreviewdialog.cpp
+    src/ui/thinkingpopup.h
+    src/ui/thinkingpopup.cpp
 )
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugins)

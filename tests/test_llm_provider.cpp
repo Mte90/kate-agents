@@ -25,7 +25,8 @@ struct MockProvider : public LLMProvider
     void chatStream(const std::vector<LLMMessage> &, const std::vector<ToolDefinition> &, const QString &,
                    std::function<void(const QString &chunk)>,
                    std::function<void(const LLMResponse &final)>,
-                   std::function<void(const QString &error)>) override {
+                   std::function<void(const QString &error)>,
+                   std::function<void(const QString &)> = nullptr) override {
     }
     void abort() override {}
 };
