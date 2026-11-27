@@ -654,7 +654,18 @@ void AgentPanel::onPermissionRequested(const QString &toolName, const QJsonObjec
             msgBox.setInformativeText(tr("Working directory: %1\nCommand:\n%2").arg(wd, cmd));
             alwaysBtn->setEnabled(false);
             alwaysBtn->setToolTip(tr("Persistent approval is disabled for terminal commands."));
-        } else {
+        } else if (toolName == QLatin1String("url_fetch")) {
+            const QString url = args.value(QStringLiteral("url")).toString(QStringLiteral("."));
+            msgBox.setInformativeText(tr("URL: %1\n").arg(url));
+//            alwaysBtn->setEnabled(false);
+//            alwaysBtn->setToolTip(tr("Persistent approval is disabled for terminal commands."));
+        } else if (toolName == QLatin1String("web_search")) {
+            const QString query = args.value(QStringLiteral("query")).toString(QStringLiteral("."));
+            msgBox.setInformativeText(tr("query: %1\n").arg(query));
+//            alwaysBtn->setEnabled(false);
+//            alwaysBtn->setToolTip(tr("Persistent approval is disabled for terminal commands."));
+        }
+        else {
             msgBox.setDetailedText(QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Indented)));
         }
     }
