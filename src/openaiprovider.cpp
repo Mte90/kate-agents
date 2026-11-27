@@ -267,7 +267,7 @@ void OpenAIProvider::chatStream(
 
             if (line.startsWith("data: ")) {
                 QByteArray jsonData = line.mid(6);
-                logRawSseData(jsonData);
+                // logRawSseData(jsonData);
                 if (jsonData.trimmed() == "[DONE]") continue;
 
                 QJsonParseError parseError;
