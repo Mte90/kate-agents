@@ -4,6 +4,8 @@
 #include "../toolregistry.h"
 #include <KLocalizedString>
 #include <QFile>
+#include <QFileInfo>
+#include <QStringConverter>
 #include <QTextStream>
 
 class ReadFileTool : public AgentTool
@@ -32,8 +34,30 @@ public:
     }
 
     QJsonObject execute(const QJsonObject &args) override {
-        QString path = args["path"].toString();
-        
+        static constexpr qint64 kMaxFileBytes = 5*1024 * 1024; // 5 MiB
+        const QString path = args["path"].toString().trimmed();
+        if (path.isEmpty()) {
+            return QJsonObject{
+                {"error", i18n("File path cannot be empty")},
+                {"success", false}
+            };
+        }
+
+        const QFileInfo info(path);
+        if (!info.exists() || !info.isFile()) {
+            return QJsonObject{
+                {"error", i18n("File does not exist or is not a regular file: %1", path)},
+                {"success", false}
+            };
+        }
+
+        if (info.size() > kMaxFileBytes) {
+            return QJsonObject{
+                {"error", i18n("File exceeds maximum allowed size (%1 bytes): %2", kMaxFileBytes, path)},
+                {"success", false}
+            };
+        }
+
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             return QJsonObject{
@@ -43,20 +67,23 @@ public:
         }
 
         QTextStream in(&file);
-        QString content = in.readAll();
+        in.setEncoding(QStringConverter::Utf8);
+        const QString content = in.readAll();
+        const bool truncated = !in.atEnd();
         file.close();
 
-        int lineCount = content.split('\n').size();
+        const int lineCount = content.isEmpty() ? 0 : content.split('\n').size();
 
         return QJsonObject{
             {"success", true},
             {"content", content},
             {"path", path},
-            {"lines", lineCount}
+            {"lines", lineCount},
+            {"truncated", truncated}
         };
     }
 
-    bool requiresPermission() const override { return false; }
+    bool requiresPermission() const override { return true; }
 };
 
 #endif

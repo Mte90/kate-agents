@@ -48,42 +48,72 @@ public:
     }
 
     QJsonObject execute(const QJsonObject &args) override {
-        QString pattern = args["pattern"].toString();
-        QString type = args["type"].toString("file");
-        int maxResults = args["max_results"].toInt(50);
+        const QString pattern = args["pattern"].toString().trimmed();
+        const QString type = args["type"].toString("file");
+        const int maxResults = args["max_results"].toInt(50);
         
-        QStringList findArgs;
-        findArgs << ".";
-        findArgs << "-type" << (type == "directory" ? "d" : "f");
-        findArgs << "-name" << pattern;
-        findArgs << "-maxdepth" << "5";
+        if (pattern.isEmpty() || pattern.startsWith(QLatin1Char('-'))) {
+            return QJsonObject{
+                {"error", i18n("Invalid search pattern")},
+                {"success", false}
+            };
+        }
+
+        if (type != "file" && type != "directory") {
+            return QJsonObject{
+                {"error", i18n("Invalid type '%1': must be 'file' or 'directory'", type)},
+                {"success", false}
+            };
+        }
+
+        const QStringList findArgs{
+            ".",
+            "-maxdepth", "5",
+            "-type", (type == "directory" ? "d" : "f"),
+            "-name", pattern
+        };
         
         QProcess process;
         process.setProgram("find");
         process.setArguments(findArgs);
-        process.setProcessChannelMode(QProcess::MergedChannels);
+        process.setProcessChannelMode(QProcess::SeparateChannels);
         
         process.start();
-        process.waitForFinished(5000);
-        
-        if (process.exitCode() != 0) {
-            QString error = process.readAllStandardError();
+        if (!process.waitForStarted(2000)) {
             return QJsonObject{
-                {"error", i18n("Find command failed: ") + error},
+                {"error", i18n("Failed to start find command: %1", process.errorString())},
+                {"success", false}
+            };
+        }
+
+        if (!process.waitForFinished(5000)) {
+            process.kill();
+            process.waitForFinished(1000);
+            return QJsonObject{
+                {"error", i18n("Find command timed out")},
+                {"success", false}
+            };
+        }
+
+        if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+            const QString errText = QString::fromLocal8Bit(process.readAllStandardError()).trimmed();
+            return QJsonObject{
+                {"error", i18n("Find command failed: %1", errText.isEmpty() ? process.errorString() : errText)},
                 {"success", false}
             };
         }
         
-        QString output = process.readAllStandardOutput();
-        QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+        const QString output = QString::fromLocal8Bit(process.readAllStandardOutput());
+        const QStringList lines = output.split('\n', Qt::SkipEmptyParts);
         
         QJsonArray results;
-        int count = 0;
         for (const QString &line : lines) {
-            if (count >= maxResults) break;
-            if (!line.trimmed().isEmpty()) {
-                results.append(line.trimmed());
-                count++;
+            if (results.size() >= maxResults) {
+                break;
+            }
+            const QString trimmed = line.trimmed();
+            if (!trimmed.isEmpty()) {
+                results.append(trimmed);
             }
         }
         
@@ -96,7 +126,7 @@ public:
         };
     }
 
-    bool requiresPermission() const override { return false; }
+    bool requiresPermission() const override { return true; }
 };
 
 #endif

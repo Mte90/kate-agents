@@ -4,9 +4,12 @@
 #include "../toolregistry.h"
 #include <KLocalizedString>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
-#include <QTextStream>
+#include <QFileInfo>
 #include <QRegularExpression>
+#include <QStringConverter>
+#include <QTextStream>
 
 class GrepTool : public AgentTool
 {
@@ -52,35 +55,64 @@ public:
     }
 
     QJsonObject execute(const QJsonObject &args) override {
-        QString pattern = args["pattern"].toString();
-        QString searchPath = args["path"].toString(".");
-        QString include = args["include"].toString("*");
-        int maxResults = args["max_results"].toInt(100);
-        
-        QRegularExpression regex(pattern);
-        if (!regex.isValid()) {
+        static constexpr qint64 kMaxFileBytes = 2 * 1024 * 1024; // 2 MiB
+        static constexpr int kMaxLineChars = 4096;
+
+        const QString pattern = args["pattern"].toString();
+        const QString rawPath = args["path"].toString().trimmed();
+        const QString searchPath = rawPath.isEmpty() ? QString(".") : rawPath;
+        const QString rawInclude = args["include"].toString().trimmed();
+        const QString include = rawInclude.isEmpty() ? QString("*") : rawInclude;
+        const int maxResults = qBound(1, args["max_results"].toInt(50), 500);
+
+        if (pattern.isEmpty() || pattern.size() > 512) {
             return QJsonObject{
-                {"error", i18n("Invalid regex pattern: ") + regex.errorString()},
+                {"error", i18n("Invalid or overly long regex pattern")},
                 {"success", false}
             };
         }
-        
+
+        const QRegularExpression regex(pattern);
+        if (!regex.isValid()) {
+            return QJsonObject{
+                {"error", i18n("Invalid regex pattern: %1", regex.errorString())},
+                {"success", false}
+            };
+        }
+
+        const QFileInfo rootInfo(searchPath);
+        if (!rootInfo.exists() || !rootInfo.isDir()) {
+            return QJsonObject{
+                {"error", i18n("Search directory does not exist: %1", searchPath)},
+                {"success", false}
+            };
+        }
+
+        const QDir rootDir(rootInfo.absoluteFilePath());
         QJsonArray results;
         int count = 0;
-        
-        // Use QDirIterator for recursive search
-        QStringList excludeDirs = {".git", ".hg", ".svn", ".venv", "venv", "node_modules", "dist", "build", "bin", "__pycache__"};
-        QDirIterator it(searchPath, QStringList() << include, QDir::Files | QDir::Readable, QDirIterator::Subdirectories);
-        
+
+        const QStringList excludeDirs = {
+            ".git", ".hg", ".svn", ".venv", "venv", "node_modules", "dist", "build", "bin", "__pycache__"
+        };
+        QDirIterator it(rootDir.absolutePath(),
+                        QStringList() << include,
+                        QDir::Files | QDir::Readable,
+                        QDirIterator::Subdirectories);
+
         while (it.hasNext() && count < maxResults) {
-            QString filePath = it.next();
-            QFileInfo fileInfo(filePath);
-            
-            // Skip files in excluded directories by checking path components
+            const QFileInfo fileInfo(it.next());
+            if (fileInfo.size() > kMaxFileBytes) {
+                continue;
+            }
+
+            const QString absolutePath = fileInfo.absoluteFilePath();
+            const QString relPath = rootDir.relativeFilePath(absolutePath);
             bool skipFile = false;
-            QString absolutePath = fileInfo.absoluteFilePath();
-            for (const QString &segment : absolutePath.split(QLatin1Char('/'))) {
-                if (excludeDirs.contains(segment)) {
+            const QStringList parts = relPath.split(QLatin1Char('/'), Qt::SkipEmptyParts);
+            // Check parent directory segments within searchPath (exclude the filename itself)
+            for (int i = 0; i < parts.size() - 1; ++i) {
+                if (excludeDirs.contains(parts.at(i))) {
                     skipFile = true;
                     break;
                 }
@@ -88,19 +120,25 @@ public:
             if (skipFile) {
                 continue;
             }
-            
-            QFile file(fileInfo.absoluteFilePath());
-            if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
-            
+
+            QFile file(absolutePath);
+            if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                continue;
+            }
+
             QTextStream in(&file);
+            in.setEncoding(QStringConverter::Utf8);
             int lineNum = 0;
             while (!in.atEnd() && count < maxResults) {
                 lineNum++;
-                QString line = in.readLine();
-                QRegularExpressionMatch match = regex.match(line);
+                QString line = in.readLine(kMaxLineChars);
+                if (line.contains(QChar::Null)) {
+                    break; // Skip binary-like files
+                }
+                const QRegularExpressionMatch match = regex.match(line);
                 if (match.hasMatch()) {
                     results.append(QJsonObject{
-                        {"file", fileInfo.absoluteFilePath()},
+                        {"file", absolutePath},
                         {"line", lineNum},
                         {"content", line},
                         {"match", match.captured(0)}
@@ -110,7 +148,7 @@ public:
             }
             file.close();
         }
-        
+
         return QJsonObject{
             {"success", true},
             {"results", results},
@@ -118,7 +156,7 @@ public:
         };
     }
 
-    bool requiresPermission() const override { return false; }
+    bool requiresPermission() const override { return true; }
 };
 
 #endif

@@ -52,14 +52,28 @@ private:
     }
 
     QString resolveResultUrl(const QUrl &baseUrl, const QString &rawHref) const {
-        const QString trimmed = rawHref.trimmed();
+        QString trimmed = rawHref.trimmed();
         if (trimmed.isEmpty()) {
             return QString();
         }
-        const QUrl resolved = baseUrl.resolved(QUrl(trimmed));
+        if (trimmed.startsWith("//")) {
+            trimmed.prepend(baseUrl.scheme() + ":");
+        }
+        QUrl resolved = baseUrl.resolved(QUrl(trimmed));
         if (!resolved.isValid() || resolved.isEmpty()) {
             return QString();
         }
+
+        // Unwrap DuckDuckGo redirect links (/l/?uddg=...) when present
+        if (resolved.host().contains("duckduckgo.com", Qt::CaseInsensitive) &&
+            resolved.path().startsWith("/l/")) {
+            const QUrlQuery query(resolved);
+            const QString uddg = query.queryItemValue("uddg", QUrl::FullyDecoded);
+            if (!uddg.isEmpty()) {
+                resolved = QUrl(uddg);
+            }
+        }
+
         const QString scheme = resolved.scheme().toLower();
         if (scheme != "http" && scheme != "https") {
             return QString();
@@ -110,7 +124,7 @@ public:
         // Use DuckDuckGo HTML scraping (no API key required)
         QNetworkAccessManager manager;
         QString encodedQuery = QUrl::toPercentEncoding(query);
-        QUrl searchUrl(QString("https://lite.duckduckgo.com/lite/?q=%1").arg(encodedQuery));
+        const QUrl searchUrl(QString("https://html.duckduckgo.com/html/?q=%1").arg(encodedQuery));
         
         QNetworkRequest request(searchUrl);
         request.setHeader(QNetworkRequest::UserAgentHeader, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
@@ -196,23 +210,17 @@ public:
         const QString html = QString::fromUtf8(buffer);
         QStringList results;
 
-        // Match result links (preferring result-link / result__a when present, falling back to any <a>)
         const QRegularExpression linkRegex(
-            "<a\\b[^>]*\\bhref=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>",
+            "<a\\b[^>]*\\bclass=[\"'][^\"']*result__a[^\"']*[\"'][^>]*\\bhref=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>",
             QRegularExpression::CaseInsensitiveOption | QRegularExpression::DotMatchesEverythingOption);
-
-        // Match common DuckDuckGo Lite / HTML snippet classes
         const QRegularExpression snippetRegex(
-            "<(?:a|td|div|span)\\b[^>]*\\bclass=[\"'][^\"']*result[_-]*(?:snippet)?[^\"']*[\"'][^>]*>(.*?)</(?:a|td|div|span)>",
+            "<(?:a|td|div|span)\\b[^>]*\\bclass=[\"'][^\"']*result__snippet[^\"']*[\"'][^>]*>(.*?)</(?:a|td|div|span)>",
             QRegularExpression::CaseInsensitiveOption | QRegularExpression::DotMatchesEverythingOption);
 
         QStringList snippets;
         QRegularExpressionMatchIterator snipIt = snippetRegex.globalMatch(html);
         while (snipIt.hasNext()) {
-            const QString cleaned = extractTextFromHtml(snipIt.next().captured(1));
-            if (!cleaned.isEmpty()) {
-                snippets.append(cleaned);
-            }
+            snippets.append(extractTextFromHtml(snipIt.next().captured(1)));
         }
 
         QRegularExpressionMatchIterator linkIt = linkRegex.globalMatch(html);
@@ -222,15 +230,9 @@ public:
 
         while (linkIt.hasNext() && count < numResults) {
             const QRegularExpressionMatch match = linkIt.next();
-            const QString rawHref = match.captured(1).trimmed();
+            const QString resolvedUrl = resolveResultUrl(searchUrl, match.captured(1));
             const QString title = extractTextFromHtml(match.captured(2));
 
-            // Skip DuckDuckGo internal/anchor/script links
-            if (rawHref.isEmpty() || rawHref.startsWith("#") || rawHref.contains("duckduckgo.com")) {
-                continue;
-            }
-
-            const QString resolvedUrl = resolveResultUrl(searchUrl, rawHref);
             if (resolvedUrl.isEmpty() || title.isEmpty()) {
                 continue;
             }
@@ -249,12 +251,9 @@ public:
         }
 
         if (results.isEmpty()) {
-            const QString preview = html.simplified();
-
             return QJsonObject{
                 {"success", false},
-                // {"error", i18n("No results found")},
-                {"error", i18n("No results found Preview: %1", preview)},
+                {"error", i18n("No results found")},
                 {"results", QJsonArray{}}
             };
         }
